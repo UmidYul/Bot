@@ -1,0 +1,17 @@
+<div class="login-wrap">
+  <div class="card login-card">
+    <h1>Вход в админку</h1>
+    <% if (error) { %>
+      <div class="flash flash-error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/admin/login">
+      <label for="login">Логин</label>
+      <input type="text" id="login" name="login" required autofocus style="width:100%" />
+      <label for="password">Пароль</label>
+      <input type="password" id="password" name="password" required style="width:100%" />
+      <div style="margin-top:20px">
+        <button type="submit" class="btn btn-primary" style="width:100%">Войти</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,58 @@
+<h1>Логи админов</h1>
+
+<div class="toolbar">
+  <form method="GET" action="/admin/logs">
+    <select name="action">
+      <option value="">Все действия</option>
+      <% actions.forEach(function (a) { %>
+        <option value="<%= a %>" <%= filters.action === a ? 'selected' : '' %>><%= a %></option>
+      <% }) %>
+    </select>
+    <select name="admin_id">
+      <option value="">Все админы</option>
+      <% admins.forEach(function (a) { %>
+        <option value="<%= a.id %>" <%= String(filters.admin_id) === String(a.id) ? 'selected' : '' %>><%= a.login %></option>
+      <% }) %>
+    </select>
+    <button type="submit" class="btn">Фильтр</button>
+  </form>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Админ</th>
+        <th>Действие</th>
+        <th>Пользователь</th>
+        <th>Детали</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% logs.forEach(function (l) { %>
+        <tr>
+          <td><%= new Date(l.created_at).toLocaleString('ru-RU') %></td>
+          <td><%= l.admin_login || 'система' %></td>
+          <td><%= l.action %></td>
+          <td><%= l.target_user_code ? l.target_user_code : '—' %></td>
+          <td class="muted"><%= l.meta ? JSON.stringify(l.meta) : '' %></td>
+        </tr>
+      <% }) %>
+      <% if (!logs.length) { %>
+        <tr><td colspan="5" class="muted">Записей ещё нет</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<div class="pagination">
+  <% for (let p = 1; p <= pageCount; p++) { %>
+    <% const qs = new URLSearchParams(Object.assign({}, filters, { page: p })).toString(); %>
+    <% if (p === page) { %>
+      <span class="current"><%= p %></span>
+    <% } else { %>
+      <a href="/admin/logs?<%= qs %>"><%= p %></a>
+    <% } %>
+  <% } %>
+</div>

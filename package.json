@@ -1,0 +1,34 @@
+{
+  "name": "tg-sub-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram-бот подписки на закрытый канал + админ-панель",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "migrate": "knex --knexfile src/db/knexfile.js migrate:latest",
+    "migrate:make": "knex --knexfile src/db/knexfile.js migrate:make",
+    "migrate:latest": "knex --knexfile src/db/knexfile.js migrate:latest",
+    "migrate:rollback": "knex --knexfile src/db/knexfile.js migrate:rollback",
+    "seed": "knex --knexfile src/db/knexfile.js seed:run",
+    "test": "node --test src/**/*.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.1",
+    "express-ejs-layouts": "^2.5.1",
+    "express-session": "^1.18.1",
+    "knex": "^3.1.0",
+    "pg": "^8.13.1",
+    "telegraf": "^4.16.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

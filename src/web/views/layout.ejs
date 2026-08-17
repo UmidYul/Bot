@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= typeof title !== 'undefined' ? title + ' — Админка' : 'Админка' %></title>
+  <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+  <% if (typeof admin !== 'undefined' && admin) { %>
+  <div class="topbar">
+    <div class="brand">TG Sub Bot</div>
+    <nav>
+      <a href="/admin/users" class="<%= typeof active !== 'undefined' && active === 'users' ? 'active' : '' %>">Пользователи</a>
+      <a href="/admin/promo-codes" class="<%= typeof active !== 'undefined' && active === 'promo-codes' ? 'active' : '' %>">Промокоды</a>
+      <a href="/admin/logs" class="<%= typeof active !== 'undefined' && active === 'logs' ? 'active' : '' %>">Логи</a>
+    </nav>
+    <span class="muted"><%= admin.login %></span>
+    <a href="/admin/logout" class="logout">Выйти</a>
+  </div>
+  <% } %>
+  <div class="container">
+    <%- body %>
+  </div>
+</body>
+</html>

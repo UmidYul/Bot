@@ -1,0 +1,65 @@
+<h1>Пользователи</h1>
+
+<% if (flash) { %>
+  <div class="flash flash-success"><%= flash %></div>
+<% } %>
+
+<div class="toolbar">
+  <form method="GET" action="/admin/users">
+    <input type="text" name="q" placeholder="Код / телефон / username" value="<%= filters.q || '' %>" />
+    <select name="status">
+      <option value="">Все статусы</option>
+      <% ['new','pending','paid','blocked'].forEach(function (s) { %>
+        <option value="<%= s %>" <%= filters.status === s ? 'selected' : '' %>><%= s %></option>
+      <% }) %>
+    </select>
+    <button type="submit" class="btn">Найти</button>
+  </form>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Код</th>
+        <th>Username</th>
+        <th>Телефон</th>
+        <th>Язык</th>
+        <th>Статус</th>
+        <th>Посл. платёж</th>
+        <th>Дата</th>
+        <th>Провайдер</th>
+        <th>Промокод</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% users.forEach(function (u) { %>
+        <tr>
+          <td><a href="/admin/users/<%= u.id %>"><%= u.code %></a></td>
+          <td><%= u.username ? '@' + u.username : '—' %></td>
+          <td><%= u.phone || '—' %></td>
+          <td><%= u.language %></td>
+          <td><span class="badge badge-<%= u.status %>"><%= u.status %></span></td>
+          <td><%= u.last_payment_amount != null ? u.last_payment_amount + ' UZS' : '—' %></td>
+          <td><%= u.last_payment_date ? new Date(u.last_payment_date).toLocaleString('ru-RU') : '—' %></td>
+          <td><%= u.last_payment_provider || '—' %></td>
+          <td><%= u.last_payment_promo || '—' %></td>
+        </tr>
+      <% }) %>
+      <% if (!users.length) { %>
+        <tr><td colspan="9" class="muted">Ничего не найдено</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>
+
+<div class="pagination">
+  <% for (let p = 1; p <= pageCount; p++) { %>
+    <% const qs = new URLSearchParams(Object.assign({}, filters, { page: p })).toString(); %>
+    <% if (p === page) { %>
+      <span class="current"><%= p %></span>
+    <% } else { %>
+      <a href="/admin/users?<%= qs %>"><%= p %></a>
+    <% } %>
+  <% } %>
+</div>

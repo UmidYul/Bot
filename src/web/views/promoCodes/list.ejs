@@ -1,0 +1,41 @@
+<h1>Промокоды</h1>
+
+<% if (flash) { %>
+  <div class="flash flash-success"><%= flash %></div>
+<% } %>
+
+<div class="toolbar">
+  <a href="/admin/promo-codes/new" class="btn btn-primary">+ Новый промокод</a>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Код</th>
+        <th>Тип</th>
+        <th>Значение</th>
+        <th>Использовано / лимит</th>
+        <th>Истекает</th>
+        <th>Активен</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% promoCodes.forEach(function (p) { %>
+        <tr>
+          <td><%= p.code %></td>
+          <td><%= p.type %></td>
+          <td><%= p.type === 'percent' ? p.value + '%' : (p.type === 'fixed' ? p.value + ' UZS' : '—') %></td>
+          <td><%= p.used_count %> / <%= p.max_uses != null ? p.max_uses : '∞' %></td>
+          <td><%= p.expires_at ? new Date(p.expires_at).toLocaleDateString('ru-RU') : '—' %></td>
+          <td><%= p.is_active ? 'да' : 'нет' %></td>
+          <td><a href="/admin/promo-codes/<%= p.id %>/edit">Изменить</a></td>
+        </tr>
+      <% }) %>
+      <% if (!promoCodes.length) { %>
+        <tr><td colspan="7" class="muted">Промокодов ещё нет</td></tr>
+      <% } %>
+    </tbody>
+  </table>
+</div>

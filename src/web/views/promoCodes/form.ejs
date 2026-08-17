@@ -1,0 +1,43 @@
+<p><a href="/admin/promo-codes">&larr; Все промокоды</a></p>
+<h1><%= promoCode ? 'Редактирование промокода' : 'Новый промокод' %></h1>
+
+<% if (error) { %>
+  <div class="flash flash-error"><%= error %></div>
+<% } %>
+
+<div class="card" style="max-width:480px">
+  <form method="POST" action="<%= promoCode ? '/admin/promo-codes/' + promoCode.id + '/edit' : '/admin/promo-codes/new' %>">
+    <label for="code">Код</label>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="code" name="code" value="<%= values.code || '' %>" required style="flex:1;text-transform:uppercase" />
+      <button type="button" class="btn" onclick="document.getElementById('code').value = Math.random().toString(36).slice(2,8).toUpperCase()">Случайный</button>
+    </div>
+
+    <label for="type">Тип</label>
+    <select id="type" name="type">
+      <option value="percent" <%= values.type === 'percent' ? 'selected' : '' %>>Процент</option>
+      <option value="fixed" <%= values.type === 'fixed' ? 'selected' : '' %>>Фиксированная сумма</option>
+      <option value="free" <%= values.type === 'free' ? 'selected' : '' %>>Бесплатный доступ</option>
+    </select>
+
+    <label for="value">Значение (% для percent, сумма для fixed, игнорируется для free)</label>
+    <input type="number" id="value" name="value" value="<%= values.value != null ? values.value : 0 %>" min="0" step="0.01" />
+
+    <label for="max_uses">Лимит использований (пусто = без лимита)</label>
+    <input type="number" id="max_uses" name="max_uses" value="<%= values.max_uses != null ? values.max_uses : '' %>" min="1" />
+
+    <label for="expires_at">Истекает (пусто = бессрочно)</label>
+    <input type="date" id="expires_at" name="expires_at" value="<%= values.expires_at || '' %>" />
+
+    <% if (promoCode) { %>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:16px">
+        <input type="checkbox" name="is_active" value="1" <%= values.is_active ? 'checked' : '' %> style="margin:0" />
+        Активен
+      </label>
+    <% } %>
+
+    <div style="margin-top:20px">
+      <button type="submit" class="btn btn-primary">Сохранить</button>
+    </div>
+  </form>
+</div>
