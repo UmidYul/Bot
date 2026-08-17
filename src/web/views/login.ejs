@@ -1,16 +1,27 @@
 <div class="login-wrap">
-  <div class="card login-card">
-    <h1>Вход в админку</h1>
+  <div class="card login-card page-enter">
+    <div class="login-brand"><span class="brand-dot"></span><%= t('app_name') %></div>
+    <div class="login-lang-switch">
+      <div class="lang-switch">
+        <a href="/admin/lang/ru" class="<%= lang === 'ru' ? 'active' : '' %>">RU</a>
+        <a href="/admin/lang/uz" class="<%= lang === 'uz' ? 'active' : '' %>">UZ</a>
+      </div>
+    </div>
+    <h1><%= t('login_title') %></h1>
     <% if (error) { %>
       <div class="flash flash-error"><%= error %></div>
     <% } %>
     <form method="POST" action="/admin/login">
-      <label for="login">Логин</label>
-      <input type="text" id="login" name="login" required autofocus style="width:100%" />
-      <label for="password">Пароль</label>
-      <input type="password" id="password" name="password" required style="width:100%" />
+      <div class="field">
+        <label for="login"><%= t('login_field_login') %></label>
+        <input type="text" id="login" name="login" required autofocus />
+      </div>
+      <div class="field">
+        <label for="password"><%= t('login_field_password') %></label>
+        <input type="password" id="password" name="password" required />
+      </div>
       <div style="margin-top:20px">
-        <button type="submit" class="btn btn-primary" style="width:100%">Войти</button>
+        <button type="submit" class="btn btn-primary btn-block"><%= t('login_submit') %></button>
       </div>
     </form>
   </div>

@@ -2,8 +2,13 @@ const config = require('./config');
 const knex = require('./db');
 const buildApp = require('./app');
 const { bot } = require('./bot');
+const settingsService = require('./services/settingsService');
 
 async function main() {
+  // Настройки, отредактированные из админки (цена канала, инвайт-ссылка и т.д.),
+  // хранятся в БД и переопределяют дефолты из .env — применяем их до старта сервера.
+  await settingsService.loadIntoConfig();
+
   const app = buildApp();
   const server = app.listen(config.port, () => {
     console.log(`HTTP-сервер запущен на порту ${config.port} (env: ${config.nodeEnv})`);
@@ -46,6 +51,18 @@ async function main() {
 
   process.once('SIGTERM', () => shutdown('SIGTERM'));
   process.once('SIGINT', () => shutdown('SIGINT'));
+
+  // Защита от полного падения процесса: все Express-роуты и бот-хендлеры уже сами
+  // ловят свои ошибки (asyncHandler, bot.catch), но это последний рубеж на случай
+  // необработанного отклонённого промиса где-то ещё — без него Node с 15-й версии
+  // молча убивает весь процесс на любой такой ошибке (именно так уронило сервер запросом
+  // с багом в SQL-запросе до этого фикса). Логируем и продолжаем жить, а не падаем.
+  process.on('unhandledRejection', (reason) => {
+    console.error('Необработанный отклонённый промис (процесс продолжает работу):', reason);
+  });
+  process.on('uncaughtException', (err) => {
+    console.error('Необработанное исключение (процесс продолжает работу):', err);
+  });
 }
 
 main().catch((err) => {

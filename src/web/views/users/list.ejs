@@ -1,4 +1,4 @@
-<h1>Пользователи</h1>
+<h1><%= t('users_title') %></h1>
 
 <% if (flash) { %>
   <div class="flash flash-success"><%= flash %></div>
@@ -6,51 +6,53 @@
 
 <div class="toolbar">
   <form method="GET" action="/admin/users">
-    <input type="text" name="q" placeholder="Код / телефон / username" value="<%= filters.q || '' %>" />
+    <input type="text" name="q" placeholder="<%= t('users_search_placeholder') %>" value="<%= filters.q || '' %>" style="width:220px" />
     <select name="status">
-      <option value="">Все статусы</option>
+      <option value=""><%= t('users_filter_all_statuses') %></option>
       <% ['new','pending','paid','blocked'].forEach(function (s) { %>
-        <option value="<%= s %>" <%= filters.status === s ? 'selected' : '' %>><%= s %></option>
+        <option value="<%= s %>" <%= filters.status === s ? 'selected' : '' %>><%= t('status_' + s) %></option>
       <% }) %>
     </select>
-    <button type="submit" class="btn">Найти</button>
+    <button type="submit" class="btn"><%= t('users_search_submit') %></button>
   </form>
 </div>
 
-<div class="card">
+<div class="card" style="padding:0">
+  <div class="table-wrap">
   <table>
     <thead>
       <tr>
-        <th>Код</th>
-        <th>Username</th>
-        <th>Телефон</th>
-        <th>Язык</th>
-        <th>Статус</th>
-        <th>Посл. платёж</th>
-        <th>Дата</th>
-        <th>Провайдер</th>
-        <th>Промокод</th>
+        <th><%= t('users_col_code') %></th>
+        <th><%= t('users_col_username') %></th>
+        <th><%= t('users_col_phone') %></th>
+        <th><%= t('users_col_language') %></th>
+        <th><%= t('users_col_status') %></th>
+        <th><%= t('users_col_last_payment') %></th>
+        <th><%= t('users_col_date') %></th>
+        <th><%= t('users_col_provider') %></th>
+        <th><%= t('users_col_promo') %></th>
       </tr>
     </thead>
     <tbody>
       <% users.forEach(function (u) { %>
         <tr>
-          <td><a href="/admin/users/<%= u.id %>"><%= u.code %></a></td>
-          <td><%= u.username ? '@' + u.username : '—' %></td>
-          <td><%= u.phone || '—' %></td>
-          <td><%= u.language %></td>
-          <td><span class="badge badge-<%= u.status %>"><%= u.status %></span></td>
-          <td><%= u.last_payment_amount != null ? u.last_payment_amount + ' UZS' : '—' %></td>
-          <td><%= u.last_payment_date ? new Date(u.last_payment_date).toLocaleString('ru-RU') : '—' %></td>
-          <td><%= u.last_payment_provider || '—' %></td>
-          <td><%= u.last_payment_promo || '—' %></td>
+          <td data-label="<%= t('users_col_code') %>" class="no-stack"><a href="/admin/users/<%= u.id %>"><%= u.code %></a></td>
+          <td data-label="<%= t('users_col_username') %>"><%= u.username ? '@' + u.username : '—' %></td>
+          <td data-label="<%= t('users_col_phone') %>"><%= u.phone || '—' %></td>
+          <td data-label="<%= t('users_col_language') %>"><%= u.language %></td>
+          <td data-label="<%= t('users_col_status') %>"><span class="badge badge-<%= u.status %>"><%= t('status_' + u.status) %></span></td>
+          <td data-label="<%= t('users_col_last_payment') %>"><%= u.last_payment_amount != null ? Number(u.last_payment_amount).toLocaleString('ru-RU') + ' UZS' : '—' %></td>
+          <td data-label="<%= t('users_col_date') %>"><%= u.last_payment_date ? new Date(u.last_payment_date).toLocaleString('ru-RU') : '—' %></td>
+          <td data-label="<%= t('users_col_provider') %>"><%= u.last_payment_provider || '—' %></td>
+          <td data-label="<%= t('users_col_promo') %>"><%= u.last_payment_promo || '—' %></td>
         </tr>
       <% }) %>
       <% if (!users.length) { %>
-        <tr><td colspan="9" class="muted">Ничего не найдено</td></tr>
+        <tr><td colspan="9" class="empty-state no-stack"><%= t('users_empty') %></td></tr>
       <% } %>
     </tbody>
   </table>
+  </div>
 </div>
 
 <div class="pagination">

@@ -1,5 +1,5 @@
-<p><a href="/admin/promo-codes">&larr; Все промокоды</a></p>
-<h1><%= promoCode ? 'Редактирование промокода' : 'Новый промокод' %></h1>
+<p><a href="/admin/promo-codes"><%= t('promo_form_back') %></a></p>
+<h1><%= promoCode ? t('promo_form_title_edit') : t('promo_form_title_new') %></h1>
 
 <% if (error) { %>
   <div class="flash flash-error"><%= error %></div>
@@ -7,37 +7,47 @@
 
 <div class="card" style="max-width:480px">
   <form method="POST" action="<%= promoCode ? '/admin/promo-codes/' + promoCode.id + '/edit' : '/admin/promo-codes/new' %>">
-    <label for="code">Код</label>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="code" name="code" value="<%= values.code || '' %>" required style="flex:1;text-transform:uppercase" />
-      <button type="button" class="btn" onclick="document.getElementById('code').value = Math.random().toString(36).slice(2,8).toUpperCase()">Случайный</button>
+    <div class="field">
+      <label for="code"><%= t('promo_field_code') %></label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="code" name="code" value="<%= values.code || '' %>" required style="flex:1;text-transform:uppercase" />
+        <button type="button" class="btn" onclick="document.getElementById('code').value = Math.random().toString(36).slice(2,8).toUpperCase()"><%= t('promo_random_button') %></button>
+      </div>
     </div>
 
-    <label for="type">Тип</label>
-    <select id="type" name="type">
-      <option value="percent" <%= values.type === 'percent' ? 'selected' : '' %>>Процент</option>
-      <option value="fixed" <%= values.type === 'fixed' ? 'selected' : '' %>>Фиксированная сумма</option>
-      <option value="free" <%= values.type === 'free' ? 'selected' : '' %>>Бесплатный доступ</option>
-    </select>
+    <div class="field">
+      <label for="type"><%= t('promo_field_type') %></label>
+      <select id="type" name="type">
+        <option value="percent" <%= values.type === 'percent' ? 'selected' : '' %>><%= t('promo_type_percent') %></option>
+        <option value="fixed" <%= values.type === 'fixed' ? 'selected' : '' %>><%= t('promo_type_fixed') %></option>
+        <option value="free" <%= values.type === 'free' ? 'selected' : '' %>><%= t('promo_type_free') %></option>
+      </select>
+    </div>
 
-    <label for="value">Значение (% для percent, сумма для fixed, игнорируется для free)</label>
-    <input type="number" id="value" name="value" value="<%= values.value != null ? values.value : 0 %>" min="0" step="0.01" />
+    <div class="field">
+      <label for="value"><%= t('promo_field_value') %></label>
+      <input type="number" id="value" name="value" value="<%= values.value != null ? values.value : 0 %>" min="0" step="0.01" />
+    </div>
 
-    <label for="max_uses">Лимит использований (пусто = без лимита)</label>
-    <input type="number" id="max_uses" name="max_uses" value="<%= values.max_uses != null ? values.max_uses : '' %>" min="1" />
+    <div class="field">
+      <label for="max_uses"><%= t('promo_field_max_uses') %></label>
+      <input type="number" id="max_uses" name="max_uses" value="<%= values.max_uses != null ? values.max_uses : '' %>" min="1" />
+    </div>
 
-    <label for="expires_at">Истекает (пусто = бессрочно)</label>
-    <input type="date" id="expires_at" name="expires_at" value="<%= values.expires_at || '' %>" />
+    <div class="field">
+      <label for="expires_at"><%= t('promo_field_expires_at') %></label>
+      <input type="date" id="expires_at" name="expires_at" value="<%= values.expires_at || '' %>" />
+    </div>
 
     <% if (promoCode) { %>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:16px">
-        <input type="checkbox" name="is_active" value="1" <%= values.is_active ? 'checked' : '' %> style="margin:0" />
-        Активен
-      </label>
+      <div class="checkbox-row">
+        <input type="checkbox" id="is_active" name="is_active" value="1" <%= values.is_active ? 'checked' : '' %> />
+        <label for="is_active"><%= t('promo_field_active') %></label>
+      </div>
     <% } %>
 
-    <div style="margin-top:20px">
-      <button type="submit" class="btn btn-primary">Сохранить</button>
+    <div style="margin-top:24px">
+      <button type="submit" class="btn btn-primary"><%= t('btn_save') %></button>
     </div>
   </form>
 </div>

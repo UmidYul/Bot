@@ -1,49 +1,51 @@
-<h1>Логи админов</h1>
+<h1><%= t('logs_title') %></h1>
 
 <div class="toolbar">
   <form method="GET" action="/admin/logs">
     <select name="action">
-      <option value="">Все действия</option>
+      <option value=""><%= t('logs_filter_all_actions') %></option>
       <% actions.forEach(function (a) { %>
         <option value="<%= a %>" <%= filters.action === a ? 'selected' : '' %>><%= a %></option>
       <% }) %>
     </select>
     <select name="admin_id">
-      <option value="">Все админы</option>
+      <option value=""><%= t('logs_filter_all_admins') %></option>
       <% admins.forEach(function (a) { %>
         <option value="<%= a.id %>" <%= String(filters.admin_id) === String(a.id) ? 'selected' : '' %>><%= a.login %></option>
       <% }) %>
     </select>
-    <button type="submit" class="btn">Фильтр</button>
+    <button type="submit" class="btn"><%= t('logs_filter_submit') %></button>
   </form>
 </div>
 
-<div class="card">
+<div class="card" style="padding:0">
+  <div class="table-wrap">
   <table>
     <thead>
       <tr>
-        <th>Дата</th>
-        <th>Админ</th>
-        <th>Действие</th>
-        <th>Пользователь</th>
-        <th>Детали</th>
+        <th><%= t('logs_col_date') %></th>
+        <th><%= t('logs_col_admin') %></th>
+        <th><%= t('logs_col_action') %></th>
+        <th><%= t('logs_col_user') %></th>
+        <th><%= t('logs_col_details') %></th>
       </tr>
     </thead>
     <tbody>
       <% logs.forEach(function (l) { %>
         <tr>
-          <td><%= new Date(l.created_at).toLocaleString('ru-RU') %></td>
-          <td><%= l.admin_login || 'система' %></td>
-          <td><%= l.action %></td>
-          <td><%= l.target_user_code ? l.target_user_code : '—' %></td>
-          <td class="muted"><%= l.meta ? JSON.stringify(l.meta) : '' %></td>
+          <td data-label="<%= t('logs_col_date') %>"><%= new Date(l.created_at).toLocaleString('ru-RU') %></td>
+          <td data-label="<%= t('logs_col_admin') %>"><%= l.admin_login || t('logs_system') %></td>
+          <td data-label="<%= t('logs_col_action') %>"><%= l.action %></td>
+          <td data-label="<%= t('logs_col_user') %>"><%= l.target_user_code ? l.target_user_code : '—' %></td>
+          <td data-label="<%= t('logs_col_details') %>" class="faint"><%= l.meta ? JSON.stringify(l.meta) : '' %></td>
         </tr>
       <% }) %>
       <% if (!logs.length) { %>
-        <tr><td colspan="5" class="muted">Записей ещё нет</td></tr>
+        <tr><td colspan="5" class="empty-state no-stack"><%= t('logs_empty') %></td></tr>
       <% } %>
     </tbody>
   </table>
+  </div>
 </div>
 
 <div class="pagination">

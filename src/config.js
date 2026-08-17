@@ -36,9 +36,17 @@ const config = {
     merchantId: process.env.CLICK_MERCHANT_ID || '',
     merchantUserId: process.env.CLICK_MERCHANT_USER_ID || '',
     secretKey: process.env.CLICK_SECRET_KEY || '',
+    // provider_token из BotFather (/mybots -> Payments -> Click) для встроенного чек-аута
+    // Telegram (sendInvoice/pre_checkout_query/successful_payment) — НЕ то же самое, что
+    // secretKey выше (тот — для вебхуков Shop API при оплате напрямую через приложение Click).
+    providerToken: process.env.CLICK_PROVIDER_TOKEN || '',
   },
 
   payme: {
+    // Временно отключено по просьбе заказчика — кнопка Payme скрыта из бота, вебхук
+    // /payments/payme при этом остаётся рабочим на будущее. Включать через .env,
+    // не менять код: PAYME_ENABLED=true.
+    enabled: process.env.PAYME_ENABLED === 'true',
     merchantId: process.env.PAYME_MERCHANT_ID || '',
     secretKey: process.env.PAYME_SECRET_KEY || '',
     testKey: process.env.PAYME_TEST_KEY || '',
@@ -48,7 +56,38 @@ const config = {
     login: process.env.ADMIN_SEED_LOGIN || 'admin',
     password: process.env.ADMIN_SEED_PASSWORD || 'admin',
   },
+
+  // Telegram user/chat id админов, которым бот шлёт уведомления (новая оплата, всплеск
+  // неверных промокодов, необработанные ошибки). Список через запятую, можно узнать свой
+  // id через @userinfobot. Пусто — уведомления просто не отправляются.
+  adminNotifyChatIds: (process.env.ADMIN_NOTIFY_CHAT_IDS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+
+  promoAntiSpam: {
+    maxAttempts: parseInt(process.env.PROMO_MAX_ATTEMPTS || '5', 10),
+    lockoutMinutes: parseInt(process.env.PROMO_LOCKOUT_MINUTES || '15', 10),
+  },
+
+  backup: {
+    // Путь к pg_dump — на Linux VPS обычно уже в PATH (пакет postgresql-client),
+    // на Windows-деве нужно указать явно, см. .env.example.
+    pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
+    retentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS || '7', 10),
+    dir: process.env.BACKUP_DIR || 'backups',
+  },
 };
+
+// Геттер, а не статический массив: настройки (см. src/services/settingsService.js) могут
+// включить/выключить Payme из админки в рантайме без рестарта процесса — здесь всегда
+// пересчитывается по актуальному config.payme.enabled.
+Object.defineProperty(config, 'enabledPaymentProviders', {
+  enumerable: true,
+  get() {
+    return ['click', ...(config.payme.enabled ? ['payme'] : [])];
+  },
+});
 
 // Telegram принимает вебхуки только на публичный HTTPS-адрес. Локально (localhost/127.0.0.1)
 // его не достать снаружи, поэтому в деве бот сам переключается на long-polling — вручную

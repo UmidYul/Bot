@@ -37,9 +37,19 @@ function findActiveByCode(code) {
     .first();
 }
 
+/**
+ * Атомарно занимает один "слот" использования промокода — условие max_uses проверяется
+ * в том же UPDATE, что и инкремент, поэтому под конкурентной нагрузкой used_count никогда
+ * не перескочит max_uses (без этого условия два одновременных запроса на последнем
+ * оставшемся использовании оба прошли бы проверку и оба инкрементировали счётчик).
+ * @returns {Promise<object|undefined>} обновлённая запись, либо undefined если слотов не осталось
+ */
 async function incrementUsage(id) {
   const [promo] = await db('promo_codes')
     .where({ id })
+    .andWhere((builder) => {
+      builder.whereNull('max_uses').orWhereRaw('used_count < max_uses');
+    })
     .update({ used_count: db.raw('used_count + 1') })
     .returning('*');
   return promo;

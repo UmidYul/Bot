@@ -13,6 +13,7 @@
     "migrate:latest": "knex --knexfile src/db/knexfile.js migrate:latest",
     "migrate:rollback": "knex --knexfile src/db/knexfile.js migrate:rollback",
     "seed": "knex --knexfile src/db/knexfile.js seed:run",
+    "backup": "node scripts/backup.js",
     "test": "node --test src/**/*.test.js"
   },
   "dependencies": {

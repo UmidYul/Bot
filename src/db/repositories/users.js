@@ -62,15 +62,18 @@ async function listUsers(filters = {}, pagination = {}) {
   const page = Math.max(1, parseInt(pagination.page, 10) || 1);
   const pageSize = pagination.pageSize || 20;
 
+  // Колонки квалифицированы через users.* намеренно: в rows-запросе ниже добавляется
+  // LATERAL JOIN на payments (у неё тоже есть status), без префикса Postgres не может
+  // понять, чей это столбец, и падает с "неоднозначная ссылка на столбец".
   const base = db('users');
   if (filters.q) {
     const q = `%${filters.q.trim()}%`;
     base.where((builder) => {
-      builder.whereILike('code', q).orWhereILike('phone', q).orWhereILike('username', q);
+      builder.whereILike('users.code', q).orWhereILike('users.phone', q).orWhereILike('users.username', q);
     });
   }
   if (filters.status) {
-    base.andWhere({ status: filters.status });
+    base.andWhere({ 'users.status': filters.status });
   }
 
   const countRow = await base.clone().count({ count: '*' }).first();

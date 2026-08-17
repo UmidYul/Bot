@@ -19,7 +19,9 @@ async function grantAccess(user) {
   }
 
   try {
-    await botRef.telegram.sendMessage(user.telegram_id, t(user.language, 'access_granted', config.channelInviteLink));
+    await botRef.telegram.sendMessage(user.telegram_id, t(user.language, 'access_granted', config.channelInviteLink), {
+      parse_mode: 'HTML',
+    });
   } catch (err) {
     console.error(`grantAccess: не удалось отправить сообщение юзеру ${user.telegram_id}:`, err.message);
   }

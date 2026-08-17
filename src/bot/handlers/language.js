@@ -1,6 +1,7 @@
 const usersRepo = require('../../db/repositories/users');
 const { t } = require('../i18n');
-const { sharePhoneKeyboard } = require('../keyboards');
+const { html } = require('../reply');
+const { promptForPhone, routeExistingUser } = require('./start');
 
 async function handleLanguageChoice(ctx) {
   const lang = ctx.match[1]; // 'ru' | 'uz'
@@ -11,13 +12,21 @@ async function handleLanguageChoice(ctx) {
     return;
   }
 
+  const isFirstTimeSetup = !user.phone;
+
   await usersRepo.updateLanguage(user.id, lang);
   ctx.state.user.language = lang;
 
   await ctx.answerCbQuery();
   await ctx.editMessageReplyMarkup(undefined).catch(() => {});
-  await ctx.reply(t(lang, 'welcome'));
-  await ctx.reply(t(lang, 'share_phone_button'), sharePhoneKeyboard(lang));
+
+  if (isFirstTimeSetup) {
+    await promptForPhone(ctx, ctx.state.user);
+    return;
+  }
+
+  await ctx.reply(t(lang, 'language_changed'), html());
+  await routeExistingUser(ctx, ctx.state.user);
 }
 
 module.exports = { handleLanguageChoice };

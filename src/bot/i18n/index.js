@@ -19,4 +19,14 @@ function t(lang, key, ...args) {
   return typeof entry === 'function' ? entry(...args) : entry;
 }
 
-module.exports = { t, dictionaries, DEFAULT_LANG };
+/**
+ * Значение ключа сразу на всех языках — для bot.hears() по кнопкам меню, чтобы кнопка
+ * срабатывала независимо от того, на каком языке она была показана юзеру.
+ * @param {string} key
+ * @returns {string[]}
+ */
+function allVariants(key) {
+  return Object.values(dictionaries).map((dict) => dict[key]);
+}
+
+module.exports = { t, dictionaries, DEFAULT_LANG, allVariants };

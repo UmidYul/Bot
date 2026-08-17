@@ -1,0 +1,71 @@
+<h1><%= t('settings_title') %></h1>
+
+<% if (flash) { %>
+  <div class="flash flash-success"><%= flash %></div>
+<% } %>
+<% if (error) { %>
+  <div class="flash flash-error"><%= error %></div>
+<% } %>
+
+<p class="muted" style="margin:-8px 0 20px;max-width:640px"><%= t('settings_intro') %></p>
+
+<div class="card" style="max-width:640px">
+  <form method="POST" action="/admin/settings">
+    <div class="card-section">
+      <div class="card-section-title"><%= t('settings_section_channel') %></div>
+
+      <div class="field">
+        <label for="channel_price"><%= t('settings_field_channel_price') %></label>
+        <input type="number" id="channel_price" name="channel_price" value="<%= values.channel_price %>" min="0" step="0.01" required />
+      </div>
+
+      <div class="field">
+        <label for="channel_invite_link"><%= t('settings_field_channel_invite_link') %></label>
+        <input type="text" id="channel_invite_link" name="channel_invite_link" value="<%= values.channel_invite_link || '' %>" placeholder="https://t.me/+..." />
+        <div class="field-hint"><%= t('settings_field_channel_invite_link_hint') %></div>
+      </div>
+
+      <div class="field">
+        <label for="channel_id"><%= t('settings_field_channel_id') %></label>
+        <input type="text" id="channel_id" name="channel_id" value="<%= values.channel_id || '' %>" placeholder="-1001234567890" />
+        <div class="field-hint"><%= t('settings_field_channel_id_hint') %></div>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="card-section-title"><%= t('settings_section_payments') %></div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="payme_enabled" name="payme_enabled" value="on" <%= values.payme_enabled ? 'checked' : '' %> />
+        <label for="payme_enabled"><%= t('settings_field_payme_enabled') %></label>
+      </div>
+      <div class="field-hint"><%= t('settings_field_payme_enabled_hint') %></div>
+    </div>
+
+    <div class="card-section">
+      <div class="card-section-title"><%= t('settings_section_antispam') %></div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="promo_max_attempts"><%= t('settings_field_promo_max_attempts') %></label>
+          <input type="number" id="promo_max_attempts" name="promo_max_attempts" value="<%= values.promo_max_attempts %>" min="1" required />
+        </div>
+        <div class="field">
+          <label for="promo_lockout_minutes"><%= t('settings_field_promo_lockout_minutes') %></label>
+          <input type="number" id="promo_lockout_minutes" name="promo_lockout_minutes" value="<%= values.promo_lockout_minutes %>" min="1" required />
+        </div>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="card-section-title"><%= t('settings_section_notify') %></div>
+      <div class="field">
+        <label for="admin_notify_chat_ids"><%= t('settings_field_admin_notify_chat_ids') %></label>
+        <input type="text" id="admin_notify_chat_ids" name="admin_notify_chat_ids" value="<%= Array.isArray(values.admin_notify_chat_ids) ? values.admin_notify_chat_ids.join(', ') : (values.admin_notify_chat_ids || '') %>" placeholder="123456789, 987654321" />
+        <div class="field-hint"><%= t('settings_field_admin_notify_chat_ids_hint') %></div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px">
+      <button type="submit" class="btn btn-primary"><%= t('settings_save') %></button>
+    </div>
+  </form>
+</div>

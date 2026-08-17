@@ -1,7 +1,10 @@
 const config = require('../config');
 const paymentsRepo = require('../db/repositories/payments');
 const usersRepo = require('../db/repositories/users');
+const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
+const { sendReceipt } = require('../services/receiptService');
+const { notifyNewPayment } = require('../services/adminNotifyService');
 
 // Стандартные коды ошибок Payme Merchant API.
 const ERROR = {
@@ -41,13 +44,26 @@ function checkAuth(authorizationHeader) {
 }
 
 /**
- * Ищет наш payment по account, присланному Payme. Поле account.* настраивается в личном
- * кабинете Payme Business — здесь ожидаем account.merchant_trans_id (см. payme.linkBuilder.js).
+ * Разбирает account, присланный Payme. Поле account.* настраивается в личном кабинете
+ * Payme Business — здесь ожидаем account.merchant_trans_id (см. payme.linkBuilder.js).
+ *
+ * Если платежа с таким merchant_trans_id ещё нет в БД — это может быть "оплата как за
+ * коммуналку": юзер открыл приложение Payme напрямую, минуя бота, и ввёл свой код
+ * лицевого счёта. В этом случае merchant_trans_id прилетает как есть (сам код), и мы
+ * пробуем найти по нему юзера, чтобы завести платёж на лету.
+ * @returns {Promise<{merchantTransId: string, payment: object|null, user: object|null}|null>}
  */
-async function findPaymentByAccount(account) {
+async function resolveAccount(account) {
   const merchantTransId = account && (account.merchant_trans_id || account.code);
   if (!merchantTransId) return null;
-  return paymentsRepo.findByMerchantTransId(merchantTransId);
+
+  const payment = await paymentsRepo.findByMerchantTransId(merchantTransId);
+  if (payment) return { merchantTransId, payment, user: null };
+
+  const user = await usersRepo.findByCode(merchantTransId);
+  if (!user || user.status === 'blocked' || user.status === 'paid') return null;
+
+  return { merchantTransId, payment: null, user };
 }
 
 function amountsMatch(paymentAmountUzs, paymeAmountTiyin) {
@@ -74,15 +90,21 @@ async function logEvent(paymentId, event, payload) {
 }
 
 async function checkPerformTransaction(params) {
-  const payment = await findPaymentByAccount(params.account);
-  if (!payment) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
+  const resolved = await resolveAccount(params.account);
+  if (!resolved) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
 
-  await logEvent(payment.id, 'CheckPerformTransaction', params);
+  // На этом шаге платёж в БД может ещё не существовать (юзер только проверяет возможность
+  // оплаты по коду) — читаем ожидаемую сумму либо из уже созданного payment, либо
+  // используем текущую цену канала для ещё не заведённого "ручного" платежа.
+  const amount = resolved.payment ? resolved.payment.amount : config.channelPrice;
+  const status = resolved.payment ? resolved.payment.status : 'pending';
 
-  if (payment.status !== 'pending') {
+  await logEvent(resolved.payment ? resolved.payment.id : null, 'CheckPerformTransaction', params);
+
+  if (status !== 'pending') {
     throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
   }
-  if (!amountsMatch(payment.amount, params.amount)) {
+  if (!amountsMatch(amount, params.amount)) {
     throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
   }
 
@@ -93,8 +115,20 @@ async function createTransaction(params) {
   let payment = await paymentsRepo.findByProviderTransId(params.id);
 
   if (!payment) {
-    payment = await findPaymentByAccount(params.account);
-    if (!payment) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
+    const resolved = await resolveAccount(params.account);
+    if (!resolved) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
+
+    // Платёж по коду ещё не заведён в БД — юзер платит вручную через приложение Payme,
+    // минуя бота. Создаём платёж на лету по текущей цене канала.
+    payment =
+      resolved.payment ||
+      (await paymentsRepo.createPayment({
+        userId: resolved.user.id,
+        provider: 'payme',
+        amount: config.channelPrice,
+        merchantTransId: resolved.merchantTransId,
+        status: 'pending',
+      }));
 
     await logEvent(payment.id, 'CreateTransaction', params);
 
@@ -147,8 +181,11 @@ async function performTransaction(params) {
 
   const paidAt = new Date();
   const updated = await paymentsRepo.markPaid(payment.id, { paidAt });
+  if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
   const user = await usersRepo.updateStatus(payment.user_id, 'paid');
   await grantAccess(user);
+  await sendReceipt(user, updated);
+  await notifyNewPayment(user, updated);
 
   return {
     transaction: String(updated.id),
@@ -240,6 +277,7 @@ module.exports = {
   ERROR,
   STATE,
   // экспортируем для тестов
+  resolveAccount,
   checkPerformTransaction,
   createTransaction,
   performTransaction,

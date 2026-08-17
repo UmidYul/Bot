@@ -1,41 +1,43 @@
-<h1>Промокоды</h1>
+<h1><%= t('promo_title') %></h1>
 
 <% if (flash) { %>
   <div class="flash flash-success"><%= flash %></div>
 <% } %>
 
 <div class="toolbar">
-  <a href="/admin/promo-codes/new" class="btn btn-primary">+ Новый промокод</a>
+  <a href="/admin/promo-codes/new" class="btn btn-primary"><%= t('promo_new_button') %></a>
 </div>
 
-<div class="card">
+<div class="card" style="padding:0">
+  <div class="table-wrap">
   <table>
     <thead>
       <tr>
-        <th>Код</th>
-        <th>Тип</th>
-        <th>Значение</th>
-        <th>Использовано / лимит</th>
-        <th>Истекает</th>
-        <th>Активен</th>
+        <th><%= t('promo_col_code') %></th>
+        <th><%= t('promo_col_type') %></th>
+        <th><%= t('promo_col_value') %></th>
+        <th><%= t('promo_col_used_limit') %></th>
+        <th><%= t('promo_col_expires') %></th>
+        <th><%= t('promo_col_active') %></th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       <% promoCodes.forEach(function (p) { %>
         <tr>
-          <td><%= p.code %></td>
-          <td><%= p.type %></td>
-          <td><%= p.type === 'percent' ? p.value + '%' : (p.type === 'fixed' ? p.value + ' UZS' : '—') %></td>
-          <td><%= p.used_count %> / <%= p.max_uses != null ? p.max_uses : '∞' %></td>
-          <td><%= p.expires_at ? new Date(p.expires_at).toLocaleDateString('ru-RU') : '—' %></td>
-          <td><%= p.is_active ? 'да' : 'нет' %></td>
-          <td><a href="/admin/promo-codes/<%= p.id %>/edit">Изменить</a></td>
+          <td data-label="<%= t('promo_col_code') %>" class="no-stack"><%= p.code %></td>
+          <td data-label="<%= t('promo_col_type') %>"><%= t('promo_type_' + p.type) %></td>
+          <td data-label="<%= t('promo_col_value') %>"><%= p.type === 'percent' ? p.value + '%' : (p.type === 'fixed' ? Number(p.value).toLocaleString('ru-RU') + ' UZS' : '—') %></td>
+          <td data-label="<%= t('promo_col_used_limit') %>"><%= p.used_count %> / <%= p.max_uses != null ? p.max_uses : '∞' %></td>
+          <td data-label="<%= t('promo_col_expires') %>"><%= p.expires_at ? new Date(p.expires_at).toLocaleDateString('ru-RU') : '—' %></td>
+          <td data-label="<%= t('promo_col_active') %>"><%= p.is_active ? t('yes') : t('no') %></td>
+          <td class="no-stack"><a href="/admin/promo-codes/<%= p.id %>/edit"><%= t('promo_edit_link') %></a></td>
         </tr>
       <% }) %>
       <% if (!promoCodes.length) { %>
-        <tr><td colspan="7" class="muted">Промокодов ещё нет</td></tr>
+        <tr><td colspan="7" class="empty-state no-stack"><%= t('promo_empty') %></td></tr>
       <% } %>
     </tbody>
   </table>
+  </div>
 </div>

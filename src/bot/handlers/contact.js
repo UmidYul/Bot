@@ -1,6 +1,7 @@
 const usersRepo = require('../../db/repositories/users');
 const { t } = require('../i18n');
-const { Markup } = require('telegraf');
+const { html } = require('../reply');
+const { mainMenuKeyboard } = require('../keyboards');
 const { showPaymentScreen } = require('./start');
 
 async function handleContact(ctx) {
@@ -18,7 +19,7 @@ async function handleContact(ctx) {
   await usersRepo.updatePhone(user.id, contact.phone_number);
   ctx.state.user.phone = contact.phone_number;
 
-  await ctx.reply(t(user.language, 'phone_saved'), Markup.removeKeyboard());
+  await ctx.reply(t(user.language, 'phone_saved'), mainMenuKeyboard(user.language));
   await showPaymentScreen(ctx, ctx.state.user);
 }
 

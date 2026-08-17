@@ -1,26 +1,49 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="<%= typeof lang !== 'undefined' ? lang : 'ru' %>">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><%= typeof title !== 'undefined' ? title + ' — Админка' : 'Админка' %></title>
+  <title><%= typeof title !== 'undefined' ? title + ' — ' + t('app_name') : t('app_name') %></title>
   <link rel="stylesheet" href="/css/admin.css" />
 </head>
 <body>
   <% if (typeof admin !== 'undefined' && admin) { %>
-  <div class="topbar">
-    <div class="brand">TG Sub Bot</div>
-    <nav>
-      <a href="/admin/users" class="<%= typeof active !== 'undefined' && active === 'users' ? 'active' : '' %>">Пользователи</a>
-      <a href="/admin/promo-codes" class="<%= typeof active !== 'undefined' && active === 'promo-codes' ? 'active' : '' %>">Промокоды</a>
-      <a href="/admin/logs" class="<%= typeof active !== 'undefined' && active === 'logs' ? 'active' : '' %>">Логи</a>
-    </nav>
-    <span class="muted"><%= admin.login %></span>
-    <a href="/admin/logout" class="logout">Выйти</a>
+  <div class="topbar" id="topbar">
+    <a href="/admin/users" class="brand"><span class="brand-dot"></span><%= t('app_name') %></a>
+    <button type="button" class="menu-toggle" id="menuToggle" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="topbar-menu" id="topbarMenu">
+      <nav>
+        <a href="/admin/users" class="<%= typeof active !== 'undefined' && active === 'users' ? 'active' : '' %>"><%= t('nav_users') %></a>
+        <a href="/admin/promo-codes" class="<%= typeof active !== 'undefined' && active === 'promo-codes' ? 'active' : '' %>"><%= t('nav_promo_codes') %></a>
+        <a href="/admin/logs" class="<%= typeof active !== 'undefined' && active === 'logs' ? 'active' : '' %>"><%= t('nav_logs') %></a>
+        <a href="/admin/settings" class="<%= typeof active !== 'undefined' && active === 'settings' ? 'active' : '' %>"><%= t('nav_settings') %></a>
+      </nav>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <a href="/admin/lang/ru" class="<%= lang === 'ru' ? 'active' : '' %>">RU</a>
+          <a href="/admin/lang/uz" class="<%= lang === 'uz' ? 'active' : '' %>">UZ</a>
+        </div>
+        <span class="admin-name"><%= admin.login %></span>
+        <a href="/admin/logout" class="logout-link"><%= t('logout') %></a>
+      </div>
+    </div>
   </div>
   <% } %>
-  <div class="container">
+  <div class="container page-enter">
     <%- body %>
   </div>
+  <script>
+    (function () {
+      var toggle = document.getElementById('menuToggle');
+      var topbar = document.getElementById('topbar');
+      if (toggle && topbar) {
+        toggle.addEventListener('click', function () {
+          topbar.classList.toggle('nav-open');
+        });
+      }
+    })();
+  </script>
 </body>
 </html>

@@ -14,14 +14,18 @@
 
 ```
 src/
-  bot/          — Telegraf: хендлеры, i18n (ru/uz), клавиатуры, Postgres-сессии
+  bot/          — Telegraf: хендлеры (start/profile/language/payment/joinRequest),
+                  i18n (ru/uz), клавиатуры, меню, Postgres-сессии
   web/          — Express: роуты /admin/*, EJS-вьюхи, статика
   db/           — knexfile, migrations/, seeds/, repositories/
-  payments/     — интеграции Click (Prepare/Complete) и Payme (JSON-RPC)
-  services/     — codeGenerator, promoService, accessService (выдача/отзыв доступа)
+  payments/     — Click (Shop API webhook), Payme (JSON-RPC), Telegram Payments (sendInvoice)
+  services/     — codeGenerator, promoService, accessService, receiptService,
+                  adminNotifyService
   config.js     — чтение .env
   app.js        — сборка Express-приложения
   index.js      — точка входа, graceful shutdown
+scripts/
+  backup.js     — npm run backup — pg_dump + ротация старых бэкапов
 ```
 
 ## Локальный запуск (Windows/PostgreSQL)
@@ -107,6 +111,41 @@ Telegram принимает вебхуки только на публичный 
    например через Nginx + Let's Encrypt как reverse proxy перед портом из `PORT`.
 6. Процесс поддерживает graceful shutdown — `pm2 restart`/`pm2 stop` корректно закрывают
    HTTP-сервер и пул Postgres перед завершением.
+7. Пропиши `ADMIN_NOTIFY_CHAT_IDS` (см. ниже) и настрой крон для бэкапов БД.
+
+## Бэкапы Postgres
+
+```
+npm run backup
+```
+
+Делает `pg_dump` в custom-формате (`backups/tg_sub_bot_<дата>.dump`, восстанавливается
+через `pg_restore`) и удаляет бэкапы старше `BACKUP_RETENTION_DAYS` (по умолчанию 7 дней).
+
+- На VPS `pg_dump` обычно уже в `PATH` после установки `postgresql-client` — `PG_DUMP_PATH`
+  можно оставить как `pg_dump`.
+- На Windows-деве укажи полный путь в `.env`, например
+  `PG_DUMP_PATH=C:\Program Files\PostgreSQL\18\bin\pg_dump.exe`.
+
+Крон на VPS (каждую ночь в 3:00):
+```
+0 3 * * * cd /path/to/app && /usr/bin/node scripts/backup.js >> backup.log 2>&1
+```
+
+Восстановление из бэкапа:
+```
+pg_restore --clean --if-exists -d tg_sub_bot backups/tg_sub_bot_20260101_030000.dump
+```
+
+## Уведомления админам в Telegram
+
+Укажи в `.env` `ADMIN_NOTIFY_CHAT_IDS` (через запятую, свой id можно узнать у
+[@userinfobot](https://t.me/userinfobot)) — и бот будет присылать туда:
+- каждую новую успешную оплату (сумма, способ, номер платежа),
+- всплеск неверных попыток ввода промокода (см. антиспам ниже),
+- необработанные ошибки бота (с номером апдейта и текстом ошибки).
+
+Пусто — уведомления просто не отправляются, остальной функционал не страдает.
 
 ## Чек-лист перед продакшеном
 
@@ -126,17 +165,56 @@ Telegram принимает вебхуки только на публичный 
 - [ ] Настроен HTTPS (обязателен и для Telegram webhook, и для Click/Payme)
 - [ ] `SESSION_SECRET` и `ADMIN_SEED_PASSWORD` заменены на боевые значения (не дефолтные
       dev-заглушки из `.env.example`)
+- [ ] `CLICK_PROVIDER_TOKEN` заменён с `TEST` на боевой (`LIVE`) токен из BotFather
+- [ ] Когда Payme будет готов — `PAYME_ENABLED=true` и реальные `PAYME_MERCHANT_ID`/`SECRET_KEY`
+- [ ] `ADMIN_NOTIFY_CHAT_IDS` заполнен (иначе уведомления о новых оплатах/ошибках не придут)
+- [ ] Настроен крон для `npm run backup` (см. раздел «Бэкапы Postgres»)
 
 ## Что стоит держать в голове
 
-- **Единицы измерения суммы различаются**: Click и наша БД оперируют сумами (UZS), Payme —
-  тийинами (1 сум = 100 тийин). Пересчёт учтён в `src/payments/payme.js` (`amountsMatch`).
-- **Идемпотентность**: оба провайдера могут слать повторные вебхуки — все обработчики
-  (`click.js`, `payme.js`) написаны так, чтобы повторный запрос не начислял доступ дважды.
-- **Реальных merchant-данных ещё нет** — `src/payments/*.linkBuilder.js` содержат рабочую
-  схему ссылки с явными `TODO`, которые нужно сверить в личных кабинетах Click/Payme перед
-  боевым запуском. Пока эти переменные пустые, бот вместо ссылки на оплату показывает
-  номер платежа текстом (см. `src/bot/handlers/payment.js`).
+- **Payme временно отключён** (`PAYME_ENABLED=false`) — кнопка скрыта из бота, но вебхук
+  `/payments/payme` остаётся рабочим. Включается одной переменной в `.env`, без правок кода.
+- **Click подключён как Telegram Payments** (`CLICK_PROVIDER_TOKEN` из BotFather →
+  `/mybots` → Payments) — юзер платит во встроенном чек-ауте Telegram
+  (`sendInvoice` → `pre_checkout_query` → `successful_payment`, см.
+  `src/payments/telegramPayments.js`), без перехода по ссылке. Отдельно от этого
+  `src/payments/click.js` реализует сырой Click Shop API — для сценария, когда юзер платит
+  вручную через приложение Click по своему коду (виден в `/profile`).
+- **Единицы измерения суммы различаются**: Click Shop API и наша БД оперируют сумами (UZS),
+  Payme и Telegram Payments — минимальными единицами (тийины/copecks, ×100). Пересчёт учтён
+  в `payme.js` (`amountsMatch`) и `telegramPayments.js` (`toTelegramAmount`).
+  - **Идемпотентность**: все три платёжных пути (Click, Payme, Telegram Payments) написаны
+  так, чтобы повторный вебхук/апдейт не начислял доступ дважды и не удваивал `used_count`
+  промокода — инкремент `used_count` атомарный (условный `UPDATE`), поэтому под конкурентной
+  нагрузкой лимитированный промокод не может быть использован сверх `max_uses`.
+- **Реальных merchant-данных Click/Payme (Shop API) ещё нет** —
+  `src/payments/*.linkBuilder.js` содержат рабочую схему ссылки с явными `TODO`, которые
+  нужно сверить в личных кабинетах перед боевым запуском.
+- **Оплата "как за коммуналку" работает с холодного старта** — юзер может открыть
+  приложение Click или Payme напрямую, минуя бота, найти сервис и ввести свой код
+  (`/profile`) как номер лицевого счёта. На этот момент в БД ещё нет платежа — `click.js`
+  (`resolveOrCreatePayment`) и `payme.js` (`resolveAccount`/`createTransaction`) сначала
+  ищут существующий платёж по `merchant_trans_id`/`account`, а если не находят — пробуют
+  найти юзера по этому же значению как по коду и заводят платёж на лету по текущей цене
+  канала. Единая точка идентификации клиента везде одна — `users.code`, независимо от того,
+  через бота пришла оплата или напрямую через приложение провайдера. Тот же паттерн
+  закладывается под будущие провайдеры (UzumBank, Paynet — см. ниже).
+- **UzumBank и Paynet — в планах, ещё не подключены.** Оба провайдера не поддерживают
+  Telegram Payments (только прямую интеграцию по своему протоколу), и в отличие от Click/Payme
+  не публикуют открытую документацию — у UzumBank она за JS-порталом, у Paynet доступ только
+  через партнёрское соглашение (`marketing@paynet.uz`). Примерная схема (по независимой
+  реализации PayTechUz, не официальная): UzumBank — REST, экшены `check/create/confirm/reverse/status`,
+  Basic auth + `serviceId`; Paynet — JSON-RPC 2.0, `GetInformation/PerformTransaction/CheckTransaction/
+  CancelTransaction/GetStatement`, Basic auth + обязательный IP-whitelisting сервера на их стороне.
+  Перед реализацией нужно свериться с реальными доками от аккаунт-менеджера каждого провайдера —
+  поля/подписи в открытых источниках не подтверждены официально.
+- **Антиспам на промокоды**: после `PROMO_MAX_ATTEMPTS` (по умолчанию 5) неверных попыток
+  подряд ввод блокируется на `PROMO_LOCKOUT_MINUTES` (по умолчанию 15) — защита от перебора
+  кодов. Админ получает уведомление о блокировке, если настроен `ADMIN_NOTIFY_CHAT_IDS`.
+- **Меню и профиль**: постоянное меню (👤 Профиль / 💳 Оплата / 🌐 Язык / ❓ Помощь) внизу
+  экрана появляется после того, как юзер поделился телефоном; `/profile` показывает его код
+  (моноширинным, тап копирует) — тот же код можно вписать в приложении Click как номер
+  лицевого счёта для ручной оплаты.
 
 ## Тесты
 
