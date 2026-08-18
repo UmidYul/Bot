@@ -32,6 +32,10 @@ const config = {
   sessionSecret: process.env.SESSION_SECRET || 'dev-local-secret-change-in-production',
 
   click: {
+    // Единственный из четырёх реально подключённый провайдер (Telegram Payments +
+    // сырой Shop API) — тумблер тем не менее даём, чтобы можно было временно снять
+    // кнопку из бота (например, на время проблем у провайдера), не трогая код.
+    enabled: process.env.CLICK_ENABLED !== 'false',
     serviceId: process.env.CLICK_SERVICE_ID || '',
     merchantId: process.env.CLICK_MERCHANT_ID || '',
     merchantUserId: process.env.CLICK_MERCHANT_USER_ID || '',
@@ -50,6 +54,17 @@ const config = {
     merchantId: process.env.PAYME_MERCHANT_ID || '',
     secretKey: process.env.PAYME_SECRET_KEY || '',
     testKey: process.env.PAYME_TEST_KEY || '',
+  },
+
+  // UzumBank и Paynet: интеграция (вебхуки/подписи) ещё не реализована — см. README,
+  // раздел "UzumBank и Paynet — в планах". Тумблер уже есть в настройках на будущее,
+  // но сейчас включение НЕ добавляет кнопку в бота (enabledPaymentProviders их не учитывает,
+  // см. ниже), чтобы не показывать юзерам нерабочий способ оплаты.
+  uzumbank: {
+    enabled: process.env.UZUMBANK_ENABLED === 'true',
+  },
+  paynet: {
+    enabled: process.env.PAYNET_ENABLED === 'true',
   },
 
   adminSeed: {
@@ -80,12 +95,15 @@ const config = {
 };
 
 // Геттер, а не статический массив: настройки (см. src/services/settingsService.js) могут
-// включить/выключить Payme из админки в рантайме без рестарта процесса — здесь всегда
-// пересчитывается по актуальному config.payme.enabled.
+// включать/выключать провайдеров из админки в рантайме без рестарта процесса — здесь
+// всегда пересчитывается по актуальным config.*.enabled.
+// UzumBank/Paynet сюда намеренно не попадают, даже если их тумблер включён в настройках —
+// у них ещё нет реализованных вебхуков (см. README), показывать в боте нерабочую кнопку
+// оплаты было бы хуже, чем просто скрыть её до готовности интеграции.
 Object.defineProperty(config, 'enabledPaymentProviders', {
   enumerable: true,
   get() {
-    return ['click', ...(config.payme.enabled ? ['payme'] : [])];
+    return [...(config.click.enabled ? ['click'] : []), ...(config.payme.enabled ? ['payme'] : [])];
   },
 });
 

@@ -19,7 +19,7 @@ async function handleChatJoinRequest(ctx) {
     return;
   }
 
-  if (user.status === 'blocked') {
+  if (user.blocked_at) {
     await ctx.declineChatJoinRequest(telegramId).catch(() => {});
     await adminLogsRepo.log({
       adminId: null,

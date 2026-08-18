@@ -46,12 +46,54 @@ function updateUsername(id, username) {
   return db('users').where({ id }).update({ username, updated_at: db.fn.now() });
 }
 
-function blockUser(id) {
-  return updateStatus(id, 'blocked');
+/**
+ * Бан — отдельное поле, а не значение status. Блокировка/разблокировка НЕ трогает
+ * жизненный цикл оплаты (new/pending/paid): заблокировали paid-юзера — после разблокировки
+ * он снова paid, а не 'new' (это и была причина бага "статус new после разблокировки").
+ */
+async function blockUser(id) {
+  const [user] = await db('users')
+    .where({ id })
+    .update({ blocked_at: db.fn.now(), updated_at: db.fn.now() })
+    .returning('*');
+  return user;
 }
 
-function unblockUser(id) {
-  return updateStatus(id, 'new');
+async function unblockUser(id) {
+  const [user] = await db('users')
+    .where({ id })
+    .update({ blocked_at: null, updated_at: db.fn.now() })
+    .returning('*');
+  return user;
+}
+
+/** Мягкое удаление — платежи и логи не трогаются (нужны для отчётности), юзер просто
+ * пропадает из активного списка. */
+async function deleteUser(id) {
+  const [user] = await db('users')
+    .where({ id })
+    .update({ deleted_at: db.fn.now(), updated_at: db.fn.now() })
+    .returning('*');
+  return user;
+}
+
+async function restoreUser(id) {
+  const [user] = await db('users')
+    .where({ id })
+    .update({ deleted_at: null, updated_at: db.fn.now() })
+    .returning('*');
+  return user;
+}
+
+/**
+ * Ручная корректировка баланса из админки (в любую сторону). Отрицательная сумма идёт
+ * через тот же атомарный путь, что и обычное списание — админ не может увести баланс
+ * в минус так же, как и юзер. Возвращает undefined, если списание отрицательной суммы
+ * не прошло (не хватает средств).
+ */
+function adjustBalance(id, amount) {
+  if (amount >= 0) return incrementBalance(id, amount);
+  return deductBalance(id, -amount);
 }
 
 /** Пополнение баланса — просто прибавляет, гонки тут не критичны (только зачисление). */
@@ -78,7 +120,10 @@ async function deductBalance(id, amount) {
 }
 
 /**
- * @param {{q?: string, status?: string}} filters
+ * @param {{q?: string, status?: string, deleted?: boolean}} filters status: 'new'|'pending'|
+ *   'paid' фильтрует по жизненному циклу оплаты как есть; 'blocked' — отдельно, по
+ *   blocked_at (бан теперь не значение status, а независимый флаг). deleted=true — показать
+ *   только мягко удалённых (по умолчанию они исключены из списка).
  * @param {{page?: number, pageSize?: number}} pagination
  */
 async function listUsers(filters = {}, pagination = {}) {
@@ -95,8 +140,15 @@ async function listUsers(filters = {}, pagination = {}) {
       builder.whereILike('users.code', q).orWhereILike('users.phone', q).orWhereILike('users.username', q);
     });
   }
-  if (filters.status) {
+  if (filters.status === 'blocked') {
+    base.whereNotNull('users.blocked_at');
+  } else if (filters.status) {
     base.andWhere({ 'users.status': filters.status });
+  }
+  if (filters.deleted) {
+    base.whereNotNull('users.deleted_at');
+  } else {
+    base.whereNull('users.deleted_at');
   }
 
   const countRow = await base.clone().count({ count: '*' }).first();
@@ -138,7 +190,10 @@ module.exports = {
   updateUsername,
   blockUser,
   unblockUser,
+  deleteUser,
+  restoreUser,
   incrementBalance,
   deductBalance,
+  adjustBalance,
   listUsers,
 };

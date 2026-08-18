@@ -53,11 +53,15 @@ function paymentMethodKeyboard(lang, balance) {
     Markup.button.callback(t(lang, `pay_${provider}`), `pay:method:${provider}`)
   );
 
-  return Markup.inlineKeyboard([
-    buttons,
-    [Markup.button.callback(t(lang, 'pay_balance', balance), 'pay:method:balance')],
-    [Markup.button.callback(t(lang, 'back_button'), 'pay:back')],
-  ]);
+  // Все внешние провайдеры можно выключить из настроек (например, Click на время
+  // проблем) — пустой ряд кнопок Telegram API отклоняет как невалидную клавиатуру,
+  // поэтому добавляем ряд только если в нём реально что-то есть.
+  const rows = [];
+  if (buttons.length) rows.push(buttons);
+  rows.push([Markup.button.callback(t(lang, 'pay_balance', balance), 'pay:method:balance')]);
+  rows.push([Markup.button.callback(t(lang, 'back_button'), 'pay:back')]);
+
+  return Markup.inlineKeyboard(rows);
 }
 
 function cancelPaymentKeyboard(lang) {

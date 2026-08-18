@@ -10,7 +10,8 @@ const paymentsRepo = require('../../db/repositories/payments');
 const promoCodesRepo = require('../../db/repositories/promoCodes');
 const adminLogsRepo = require('../../db/repositories/adminLogs');
 const settingsService = require('../../services/settingsService');
-const { revokeAccess } = require('../../services/accessService');
+const { revokeAccess, grantAccess } = require('../../services/accessService');
+const { notifyBalanceAdjusted } = require('../../services/balanceService');
 
 const router = express.Router();
 
@@ -75,7 +76,7 @@ function flashUrl(base, key) {
 router.get(
   '/users',
   asyncHandler(async (req, res) => {
-    const filters = { q: req.query.q || '', status: req.query.status || '' };
+    const filters = { q: req.query.q || '', status: req.query.status || '', deleted: req.query.deleted === '1' };
     const page = parseInt(req.query.page, 10) || 1;
 
     const { rows, pageCount } = await usersRepo.listUsers(filters, { page, pageSize: 20 });
@@ -92,21 +93,28 @@ router.get(
   })
 );
 
+async function renderUserDetail(req, res, user, { error = null, flash = undefined } = {}) {
+  const payments = await paymentsRepo.listByUserId(user.id);
+  const { rows: activity } = await adminLogsRepo.list({ targetUserId: user.id, page: 1, pageSize: 20 });
+
+  res.render('users/detail', {
+    title: res.locals.t('user_detail_title', user.code),
+    active: 'users',
+    user,
+    payments,
+    activity,
+    error,
+    flash: flash !== undefined ? flash : req.query.flash ? res.locals.t(`flash_${req.query.flash}`) : null,
+  });
+}
+
 router.get(
   '/users/:id',
   asyncHandler(async (req, res) => {
     const user = await usersRepo.findById(req.params.id);
     if (!user) return res.status(404).send(res.locals.t('error_user_not_found'));
 
-    const payments = await paymentsRepo.listByUserId(user.id);
-
-    res.render('users/detail', {
-      title: res.locals.t('user_detail_title', user.code),
-      active: 'users',
-      user,
-      payments,
-      flash: req.query.flash ? res.locals.t(`flash_${req.query.flash}`) : null,
-    });
+    await renderUserDetail(req, res, user);
   })
 );
 
@@ -162,6 +170,104 @@ router.post(
   })
 );
 
+router.post(
+  '/users/:id/delete',
+  asyncHandler(async (req, res) => {
+    const user = await usersRepo.findById(req.params.id);
+    if (!user) return res.status(404).send(res.locals.t('error_user_not_found'));
+
+    await usersRepo.deleteUser(user.id);
+    await logAdminAction(req, { action: 'user_delete', targetUserId: user.id });
+
+    res.redirect(flashUrl('/admin/users', 'user_deleted'));
+  })
+);
+
+router.post(
+  '/users/:id/restore',
+  asyncHandler(async (req, res) => {
+    const user = await usersRepo.findById(req.params.id);
+    if (!user) return res.status(404).send(res.locals.t('error_user_not_found'));
+
+    await usersRepo.restoreUser(user.id);
+    await logAdminAction(req, { action: 'user_restore', targetUserId: user.id });
+
+    res.redirect(flashUrl(`/admin/users/${user.id}`, 'user_restored'));
+  })
+);
+
+router.post(
+  '/users/:id/balance/adjust',
+  asyncHandler(async (req, res) => {
+    const user = await usersRepo.findById(req.params.id);
+    if (!user) return res.status(404).send(res.locals.t('error_user_not_found'));
+
+    const amount = parseFloat(req.body.amount);
+    const reason = (req.body.reason || '').trim();
+
+    if (!Number.isFinite(amount) || amount === 0) {
+      return renderUserDetail(req, res, user, { error: res.locals.t('error_invalid_amount'), flash: null });
+    }
+
+    const balanceBefore = Number(user.balance);
+    const updated = await usersRepo.adjustBalance(user.id, amount);
+    if (!updated) {
+      return renderUserDetail(req, res, user, { error: res.locals.t('error_insufficient_balance'), flash: null });
+    }
+
+    await logAdminAction(req, {
+      action: 'balance_adjust',
+      targetUserId: user.id,
+      meta: { amount, reason, balanceBefore, balanceAfter: Number(updated.balance) },
+    });
+    await notifyBalanceAdjusted(updated, amount, reason);
+
+    res.redirect(flashUrl(`/admin/users/${user.id}`, 'balance_adjusted'));
+  })
+);
+
+router.post(
+  '/users/:id/status',
+  asyncHandler(async (req, res) => {
+    const user = await usersRepo.findById(req.params.id);
+    if (!user) return res.status(404).send(res.locals.t('error_user_not_found'));
+
+    const newStatus = req.body.status;
+    if (!['new', 'pending', 'paid'].includes(newStatus)) {
+      return res.status(400).send(res.locals.t('error_invalid_status'));
+    }
+
+    const fromStatus = user.status;
+
+    if (newStatus === 'paid' && fromStatus !== 'paid') {
+      // Ручная выдача доступа без реального платежа — фиксируем это отдельной записью
+      // (provider='admin', amount=0) для аудита, точно так же, как любую другую оплату.
+      const merchantTransId = `${user.code}-admin-${Date.now()}`;
+      const payment = await paymentsRepo.createPayment({
+        userId: user.id,
+        provider: 'admin',
+        amount: 0,
+        merchantTransId,
+        status: 'paid',
+      });
+      await paymentsRepo.markPaid(payment.id);
+    }
+
+    const updated = await usersRepo.updateStatus(user.id, newStatus);
+    await logAdminAction(req, {
+      action: 'user_status_override',
+      targetUserId: user.id,
+      meta: { from: fromStatus, to: newStatus },
+    });
+
+    if (newStatus === 'paid' && fromStatus !== 'paid') {
+      await grantAccess(updated);
+    }
+
+    res.redirect(flashUrl(`/admin/users/${user.id}`, 'user_status_updated'));
+  })
+);
+
 // --- Промокоды ---
 
 router.get(
@@ -206,6 +312,10 @@ function validatePromoInput(body, t) {
   return { errors, code, type, value, maxUses, expiresAt };
 }
 
+function isAjax(req) {
+  return req.get('X-Requested-With') === 'XMLHttpRequest';
+}
+
 router.post(
   '/promo-codes/new',
   asyncHandler(async (req, res) => {
@@ -215,19 +325,23 @@ router.post(
     if (existing) errors.push(res.locals.t('error_code_taken'));
 
     if (errors.length) {
+      const error = errors.join('; ');
+      if (isAjax(req)) return res.status(400).json({ ok: false, error });
       return res.render('promoCodes/form', {
         title: res.locals.t('promo_form_title_new'),
         active: 'promo-codes',
         promoCode: null,
         values: req.body,
-        error: errors.join('; '),
+        error,
       });
     }
 
     const promo = await promoCodesRepo.create({ code, type, value, maxUses, expiresAt, isActive: true });
     await logAdminAction(req, { action: 'promo_code_create', meta: { promoCodeId: promo.id, code } });
 
-    res.redirect(flashUrl('/admin/promo-codes', 'promo_created'));
+    const redirect = flashUrl('/admin/promo-codes', 'promo_created');
+    if (isAjax(req)) return res.json({ ok: true, redirect });
+    res.redirect(redirect);
   })
 );
 
@@ -266,12 +380,14 @@ router.post(
     if (existing && existing.id !== promoCode.id) errors.push(res.locals.t('error_code_taken'));
 
     if (errors.length) {
+      const error = errors.join('; ');
+      if (isAjax(req)) return res.status(400).json({ ok: false, error });
       return res.render('promoCodes/form', {
         title: res.locals.t('promo_form_title_edit'),
         active: 'promo-codes',
         promoCode,
         values: req.body,
-        error: errors.join('; '),
+        error,
       });
     }
 
@@ -282,7 +398,25 @@ router.post(
       meta: { promoCodeId: promoCode.id, code, isActive },
     });
 
-    res.redirect(flashUrl('/admin/promo-codes', 'promo_updated'));
+    const redirect = flashUrl('/admin/promo-codes', 'promo_updated');
+    if (isAjax(req)) return res.json({ ok: true, redirect });
+    res.redirect(redirect);
+  })
+);
+
+router.post(
+  '/promo-codes/:id/toggle',
+  asyncHandler(async (req, res) => {
+    const promoCode = await promoCodesRepo.findById(req.params.id);
+    if (!promoCode) return res.status(404).send(res.locals.t('error_promo_not_found'));
+
+    const updated = await promoCodesRepo.update(promoCode.id, { isActive: !promoCode.is_active });
+    await logAdminAction(req, {
+      action: 'promo_code_toggle',
+      meta: { promoCodeId: promoCode.id, code: promoCode.code, isActive: updated.is_active },
+    });
+
+    res.redirect(flashUrl('/admin/promo-codes', updated.is_active ? 'promo_activated' : 'promo_deactivated'));
   })
 );
 
@@ -292,8 +426,13 @@ const LOG_ACTIONS = [
   'payment_status_change',
   'user_block',
   'user_unblock',
+  'user_delete',
+  'user_restore',
+  'balance_adjust',
+  'user_status_override',
   'promo_code_create',
   'promo_code_update',
+  'promo_code_toggle',
   'join_request_auto',
   'settings_update',
 ];

@@ -73,14 +73,16 @@ a:hover {
 }
 
 /* ===== Animations ===== */
+/* Только opacity, без transform: даже "нулевой" конечный translateY на .container создаёт
+   для него новый containing block (из-за animation-fill-mode: both) — все дочерние
+   position:fixed элементы (например, .modal-backdrop) тогда позиционируются относительно
+   .container, а не вьюпорта. Отсюда и баг с модалкой, не перекрывающей весь экран. */
 @keyframes fadeSlideIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -263,6 +265,48 @@ a:hover {
   padding: var(--space-6) var(--space-5) var(--space-7);
 }
 
+/* Более узкая центрированная колонка — для форм и карточек, которым не нужна вся ширина
+   контейнера (иначе они выглядят "сбитыми в кучу" у левого края широкого layout'а). */
+.narrow {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* ===== Tabs ===== */
+.tabs-nav {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-5);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.tab-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.tab-btn:hover {
+  color: var(--text);
+}
+.tab-btn.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+.tab-panel[hidden] {
+  display: none;
+}
+
 h1 {
   font-size: 21px;
   font-weight: 700;
@@ -406,6 +450,13 @@ label:first-child {
   gap: var(--space-2);
   margin-top: var(--space-4);
 }
+/* display:flex выше перебивает нативный [hidden]{display:none} — без этого элемент с
+   атрибутом hidden всё равно показывался бы (проявилось на чекбоксе "Активен" в модалке
+   промокода: он должен быть скрыт при создании нового кода, JS ставит hidden, но CSS его
+   игнорировал). */
+.checkbox-row[hidden] {
+  display: none;
+}
 .checkbox-row input[type='checkbox'] {
   width: 17px;
   height: 17px;
@@ -440,6 +491,7 @@ label:first-child {
 }
 .btn:hover {
   background: var(--neutral-soft);
+  color: var(--text);
   text-decoration: none;
 }
 .btn:active {
@@ -454,6 +506,10 @@ label:first-child {
 .btn-primary:hover {
   background: var(--primary-dark);
   border-color: var(--primary-dark);
+  /* Кнопка часто рендерится как <a class="btn btn-primary"> — общее правило a:hover
+     (color: var(--primary-dark)) специфичнее, чем .btn-primary { color:#fff }, и без этой
+     явной перебивки текст на hover сливается с фоном (оба становятся primary-dark). */
+  color: #fff;
 }
 .btn-danger {
   background: var(--danger);
@@ -462,6 +518,7 @@ label:first-child {
 }
 .btn-danger:hover {
   opacity: 0.92;
+  color: #fff;
 }
 .btn-sm {
   padding: 6px 11px;
@@ -613,6 +670,68 @@ label:first-child {
 .status-form select {
   width: auto;
   min-width: 120px;
+}
+
+/* ===== Modal ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 17, 30, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 100;
+}
+.modal-backdrop.open {
+  display: flex;
+}
+.modal-panel {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--space-5);
+  animation: modalIn 0.2s var(--ease);
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.modal-header h1 {
+  margin: 0;
+  font-size: 17px;
+}
+.modal-close {
+  appearance: none;
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.modal-close:hover {
+  background: var(--neutral-soft);
+  color: var(--text);
 }
 .empty-state {
   text-align: center;

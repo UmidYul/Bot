@@ -26,7 +26,7 @@ module.exports = {
   pay_click: '💳 Click',
   pay_payme: '💳 Payme',
   pay_balance: (balance) => `💰 Mening hisobim (${formatAmount(balance)} UZS)`,
-  payme_disabled: "Payme vaqtincha mavjud emas. Iltimos, Click orqali to'lang.",
+  provider_disabled: "Bu to'lov usuli hozircha mavjud emas. Iltimos, to'lov ekranida boshqa usulni tanlang.",
   payment_created: (amount, merchantTransId) =>
     `<b>Hisob yaratildi</b>\nSumma: <b>${formatAmount(amount)} UZS</b>\nTo'lov raqami: <code>${merchantTransId}</code>\n\nProvayder ulangach, bu yerda to'lov havolasi paydo bo'ladi.`,
   payment_link: (url) => `To'lash uchun havolaga o'ting:\n${url}`,
@@ -37,6 +37,8 @@ module.exports = {
     `⚠️ Hisobingizda mablag' yetarli emas.\n\nBalans: <b>${formatAmount(balance)} UZS</b>\nKerak: <b>${formatAmount(needed)} UZS</b>\nYetishmayapti: <b>${formatAmount(shortfall)} UZS</b>\n\nBalansni to'ldirish uchun Click yoki Payme ilovasini to'g'ridan-to'g'ri oching va kodingizni kiriting (/profile ga qarang).`,
   balance_topped_up: (amount, newBalance) =>
     `💰 <b>Balans ${formatAmount(amount)} UZS ga to'ldirildi</b>\nJoriy balans: <b>${formatAmount(newBalance)} UZS</b>\n\nKanalga kirish huquqini olish uchun menyuga qaytib, «Mening hisobim» to'lov usulini tanlang.`,
+  balance_adjusted_by_admin: (amount, newBalance, reason) =>
+    `${amount > 0 ? '💰' : '⚠️'} <b>Administrator balansingizni ${formatAmount(Math.abs(amount))} UZS ga ${amount > 0 ? "to'ldirdi" : 'kamaytirdi'}</b>${reason ? `\nSabab: ${reason}` : ''}\nJoriy balans: <b>${formatAmount(newBalance)} UZS</b>`,
 
   invoice_title: 'Kanalga kirish',
   invoice_description: "Yopiq kanalga kirish huquqi uchun to'lov",

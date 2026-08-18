@@ -1,6 +1,10 @@
 const config = require('../config');
 const settingsRepo = require('../db/repositories/settings');
 
+function parseCheckbox(raw) {
+  return raw === true || raw === 'true' || raw === '1' || raw === 'on';
+}
+
 /**
  * Настройки, управляемые из админки (не секреты — токены/ключи остаются в .env).
  * Каждая запись: где хранится в settings-таблице, куда пишется в живой config-объект,
@@ -37,12 +41,37 @@ const DEFINITIONS = {
     },
     parse: (raw) => String(raw || '').trim(),
   },
+  click_enabled: {
+    type: 'checkbox',
+    get: () => config.click.enabled,
+    set: (v) => {
+      config.click.enabled = v;
+    },
+    parse: parseCheckbox,
+  },
   payme_enabled: {
+    type: 'checkbox',
     get: () => config.payme.enabled,
     set: (v) => {
       config.payme.enabled = v;
     },
-    parse: (raw) => raw === true || raw === 'true' || raw === '1' || raw === 'on',
+    parse: parseCheckbox,
+  },
+  uzumbank_enabled: {
+    type: 'checkbox',
+    get: () => config.uzumbank.enabled,
+    set: (v) => {
+      config.uzumbank.enabled = v;
+    },
+    parse: parseCheckbox,
+  },
+  paynet_enabled: {
+    type: 'checkbox',
+    get: () => config.paynet.enabled,
+    set: (v) => {
+      config.paynet.enabled = v;
+    },
+    parse: parseCheckbox,
   },
   promo_max_attempts: {
     get: () => config.promoAntiSpam.maxAttempts,
@@ -102,7 +131,9 @@ function getCurrent() {
 async function updateFromForm(rawFormValues) {
   const applied = {};
   for (const [key, def] of Object.entries(DEFINITIONS)) {
-    if (!(key in rawFormValues) && key !== 'payme_enabled') continue;
+    // Невыставленный чекбокс вообще не приходит в теле формы — это всё равно валидное
+    // "выключено", а не "не трогать", поэтому чекбоксы обрабатываем всегда.
+    if (!(key in rawFormValues) && def.type !== 'checkbox') continue;
     const value = def.parse(rawFormValues[key]);
     def.set(value);
     await settingsRepo.set(key, value);

@@ -34,7 +34,7 @@ function resetPaymentSession(ctx) {
  */
 async function guardActionable(ctx, user) {
   if (!user) return false;
-  if (user.status === 'blocked' || user.status === 'paid') {
+  if (user.blocked_at || user.status === 'paid') {
     if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
     await routeExistingUser(ctx, user);
     return false;
@@ -184,9 +184,11 @@ async function handlePayMethod(ctx) {
     return;
   }
 
-  if (provider === 'payme' && !config.payme.enabled) {
+  // Защита от устаревшей кнопки в истории чата: провайдера могли выключить в настройках
+  // уже после того, как это сообщение было отправлено юзеру.
+  if (!config.enabledPaymentProviders.includes(provider)) {
     await ctx.answerCbQuery();
-    await ctx.reply(t(user.language, 'payme_disabled'));
+    await ctx.reply(t(user.language, 'provider_disabled'));
     return;
   }
 

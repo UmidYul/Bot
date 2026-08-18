@@ -1,4 +1,4 @@
-<h1><%= t('users_title') %></h1>
+<h1><%= t('users_title') %><% if (filters.deleted) { %> — 🗑<% } %></h1>
 
 <% if (flash) { %>
   <div class="flash flash-success"><%= flash %></div>
@@ -9,12 +9,19 @@
     <input type="text" name="q" placeholder="<%= t('users_search_placeholder') %>" value="<%= filters.q || '' %>" style="width:220px" />
     <select name="status">
       <option value=""><%= t('users_filter_all_statuses') %></option>
-      <% ['new','pending','paid','blocked'].forEach(function (s) { %>
+      <% ['new','pending','paid'].forEach(function (s) { %>
         <option value="<%= s %>" <%= filters.status === s ? 'selected' : '' %>><%= t('status_' + s) %></option>
       <% }) %>
+      <option value="blocked" <%= filters.status === 'blocked' ? 'selected' : '' %>><%= t('users_filter_blocked') %></option>
     </select>
+    <% if (filters.deleted) { %><input type="hidden" name="deleted" value="1" /><% } %>
     <button type="submit" class="btn"><%= t('users_search_submit') %></button>
   </form>
+  <% if (filters.deleted) { %>
+    <a href="/admin/users" class="btn btn-sm"><%= t('users_show_active_link') %></a>
+  <% } else { %>
+    <a href="/admin/users?deleted=1" class="btn btn-sm"><%= t('users_show_deleted_link') %></a>
+  <% } %>
 </div>
 
 <div class="card" style="padding:0">
@@ -41,7 +48,10 @@
           <td data-label="<%= t('users_col_username') %>"><%= u.username ? '@' + u.username : '—' %></td>
           <td data-label="<%= t('users_col_phone') %>"><%= u.phone || '—' %></td>
           <td data-label="<%= t('users_col_language') %>"><%= u.language %></td>
-          <td data-label="<%= t('users_col_status') %>"><span class="badge badge-<%= u.status %>"><%= t('status_' + u.status) %></span></td>
+          <td data-label="<%= t('users_col_status') %>">
+            <span class="badge badge-<%= u.status %>"><%= t('status_' + u.status) %></span>
+            <% if (u.blocked_at) { %><span class="badge badge-blocked"><%= t('status_blocked') %></span><% } %>
+          </td>
           <td data-label="<%= t('users_col_balance') %>"><%= Number(u.balance).toLocaleString('ru-RU') %> UZS</td>
           <td data-label="<%= t('users_col_last_payment') %>"><%= u.last_payment_amount != null ? Number(u.last_payment_amount).toLocaleString('ru-RU') + ' UZS' : '—' %></td>
           <td data-label="<%= t('users_col_date') %>"><%= u.last_payment_date ? new Date(u.last_payment_date).toLocaleString('ru-RU') : '—' %></td>
@@ -59,7 +69,9 @@
 
 <div class="pagination">
   <% for (let p = 1; p <= pageCount; p++) { %>
-    <% const qs = new URLSearchParams(Object.assign({}, filters, { page: p })).toString(); %>
+    <% const qsParams = { q: filters.q || '', status: filters.status || '', page: p }; %>
+    <% if (filters.deleted) qsParams.deleted = '1'; %>
+    <% const qs = new URLSearchParams(qsParams).toString(); %>
     <% if (p === page) { %>
       <span class="current"><%= p %></span>
     <% } else { %>

@@ -68,7 +68,7 @@ async function resolveOrCreatePayment(merchantTransId, proposedAmount) {
   if (existing) return existing;
 
   const user = await usersRepo.findByCode(merchantTransId);
-  if (!user || user.status === 'blocked' || user.status === 'paid') return null;
+  if (!user || user.blocked_at || user.status === 'paid') return null;
 
   return paymentsRepo.createPayment({
     userId: user.id,

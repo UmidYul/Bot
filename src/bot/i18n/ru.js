@@ -28,7 +28,7 @@ module.exports = {
   pay_click: '💳 Click',
   pay_payme: '💳 Payme',
   pay_balance: (balance) => `💰 Мой счёт (${formatAmount(balance)} UZS)`,
-  payme_disabled: 'Payme временно недоступен. Пожалуйста, оплатите через Click.',
+  provider_disabled: 'Этот способ оплаты сейчас недоступен. Пожалуйста, выберите другой на экране оплаты.',
   payment_created: (amount, merchantTransId) =>
     `<b>Счёт создан</b>\nСумма: <b>${formatAmount(amount)} UZS</b>\nНомер платежа: <code>${merchantTransId}</code>\n\nСсылка на оплату появится здесь после подключения провайдера.`,
   payment_link: (url) => `Для оплаты перейдите по ссылке:\n${url}`,
@@ -39,6 +39,8 @@ module.exports = {
     `⚠️ На балансе недостаточно средств.\n\nБаланс: <b>${formatAmount(balance)} UZS</b>\nНужно: <b>${formatAmount(needed)} UZS</b>\nНе хватает: <b>${formatAmount(shortfall)} UZS</b>\n\nПополнить баланс можно, открыв приложение Click или Payme напрямую и введя там свой код (смотрите /profile).`,
   balance_topped_up: (amount, newBalance) =>
     `💰 <b>Баланс пополнен на ${formatAmount(amount)} UZS</b>\nТекущий баланс: <b>${formatAmount(newBalance)} UZS</b>\n\nЧтобы получить доступ к каналу, вернитесь в меню и выберите способ оплаты «Мой счёт».`,
+  balance_adjusted_by_admin: (amount, newBalance, reason) =>
+    `${amount > 0 ? '💰' : '⚠️'} <b>Администратор ${amount > 0 ? 'пополнил ваш баланс на' : 'списал с вашего баланса'} ${formatAmount(Math.abs(amount))} UZS</b>${reason ? `\nПричина: ${reason}` : ''}\nТекущий баланс: <b>${formatAmount(newBalance)} UZS</b>`,
 
   invoice_title: 'Доступ к каналу',
   invoice_description: 'Оплата доступа к закрытому каналу',

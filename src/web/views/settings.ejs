@@ -7,9 +7,9 @@
   <div class="flash flash-error"><%= error %></div>
 <% } %>
 
-<p class="muted" style="margin:-8px 0 20px;max-width:640px"><%= t('settings_intro') %></p>
+<p class="muted" style="margin:-8px auto 20px;max-width:760px"><%= t('settings_intro') %></p>
 
-<div class="card" style="max-width:640px">
+<div class="card" style="max-width:760px;margin:0 auto">
   <form method="POST" action="/admin/settings">
     <div class="card-section">
       <div class="card-section-title"><%= t('settings_section_channel') %></div>
@@ -34,11 +34,30 @@
 
     <div class="card-section">
       <div class="card-section-title"><%= t('settings_section_payments') %></div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="click_enabled" name="click_enabled" value="on" <%= values.click_enabled ? 'checked' : '' %> />
+        <label for="click_enabled"><%= t('settings_field_click_enabled') %></label>
+      </div>
+      <div class="field-hint"><%= t('settings_field_click_enabled_hint') %></div>
+
       <div class="checkbox-row">
         <input type="checkbox" id="payme_enabled" name="payme_enabled" value="on" <%= values.payme_enabled ? 'checked' : '' %> />
         <label for="payme_enabled"><%= t('settings_field_payme_enabled') %></label>
       </div>
       <div class="field-hint"><%= t('settings_field_payme_enabled_hint') %></div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="uzumbank_enabled" name="uzumbank_enabled" value="on" <%= values.uzumbank_enabled ? 'checked' : '' %> />
+        <label for="uzumbank_enabled"><%= t('settings_field_uzumbank_enabled') %></label>
+      </div>
+      <div class="field-hint"><%= t('settings_field_uzumbank_enabled_hint') %></div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="paynet_enabled" name="paynet_enabled" value="on" <%= values.paynet_enabled ? 'checked' : '' %> />
+        <label for="paynet_enabled"><%= t('settings_field_paynet_enabled') %></label>
+      </div>
+      <div class="field-hint"><%= t('settings_field_paynet_enabled_hint') %></div>
     </div>
 
     <div class="card-section">

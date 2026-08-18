@@ -62,7 +62,7 @@ async function resolveAccount(account) {
   if (payment) return { merchantTransId, payment, user: null };
 
   const user = await usersRepo.findByCode(merchantTransId);
-  if (!user || user.status === 'blocked' || user.status === 'paid') return null;
+  if (!user || user.blocked_at || user.status === 'paid') return null;
 
   return { merchantTransId, payment: null, user };
 }

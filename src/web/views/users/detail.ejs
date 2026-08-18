@@ -4,71 +4,179 @@
 <% if (flash) { %>
   <div class="flash flash-success"><%= flash %></div>
 <% } %>
+<% if (typeof error !== 'undefined' && error) { %>
+  <div class="flash flash-error"><%= error %></div>
+<% } %>
 
-<div class="card">
-  <div class="grid-2">
-    <div><span class="muted"><%= t('field_telegram_id') %></span><br><%= user.telegram_id %></div>
-    <div><span class="muted"><%= t('field_username') %></span><br><%= user.username ? '@' + user.username : '—' %></div>
-    <div><span class="muted"><%= t('field_phone') %></span><br><%= user.phone || '—' %></div>
-    <div><span class="muted"><%= t('field_language') %></span><br><%= user.language %></div>
-    <div><span class="muted"><%= t('field_status') %></span><br><span class="badge badge-<%= user.status %>"><%= t('status_' + user.status) %></span></div>
-    <div><span class="muted"><%= t('field_registered') %></span><br><%= new Date(user.created_at).toLocaleString('ru-RU') %></div>
-    <div><span class="muted"><%= t('field_balance') %></span><br><b><%= Number(user.balance).toLocaleString('ru-RU') %> UZS</b></div>
-  </div>
-
-  <div class="actions" style="margin-top:20px">
-    <% if (user.status === 'blocked') { %>
-      <form method="POST" action="/admin/users/<%= user.id %>/unblock">
-        <button type="submit" class="btn btn-primary"><%= t('btn_unblock') %></button>
-      </form>
-    <% } else { %>
-      <form method="POST" action="/admin/users/<%= user.id %>/block" onsubmit="return confirm('<%= t('confirm_block') %>');">
-        <button type="submit" class="btn btn-danger"><%= t('btn_block') %></button>
-      </form>
-    <% } %>
-  </div>
+<div class="tabs-nav">
+  <button class="tab-btn active" data-tab="profile" type="button"><%= t('tab_profile') %></button>
+  <button class="tab-btn" data-tab="payments" type="button"><%= t('tab_payments') %> (<%= payments.length %>)</button>
+  <button class="tab-btn" data-tab="activity" type="button"><%= t('tab_activity') %> (<%= activity.length %>)</button>
 </div>
 
-<h2><%= t('payments_history_title') %></h2>
-<div class="card" style="padding:0">
-  <div class="table-wrap">
-  <table>
-    <thead>
-      <tr>
-        <th><%= t('payments_col_date') %></th>
-        <th><%= t('payments_col_provider') %></th>
-        <th><%= t('payments_col_purpose') %></th>
-        <th><%= t('payments_col_amount') %></th>
-        <th><%= t('payments_col_status') %></th>
-        <th><%= t('payments_col_promo') %></th>
-        <th><%= t('payments_col_change_status') %></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% payments.forEach(function (p) { %>
-        <tr>
-          <td data-label="<%= t('payments_col_date') %>"><%= new Date(p.created_at).toLocaleString('ru-RU') %></td>
-          <td data-label="<%= t('payments_col_provider') %>"><%= p.provider %></td>
-          <td data-label="<%= t('payments_col_purpose') %>"><%= p.purpose === 'topup' ? t('purpose_topup') : t('purpose_purchase') %></td>
-          <td data-label="<%= t('payments_col_amount') %>"><%= Number(p.amount).toLocaleString('ru-RU') %> <%= p.currency %></td>
-          <td data-label="<%= t('payments_col_status') %>"><span class="badge badge-<%= p.status %>"><%= p.status %></span></td>
-          <td data-label="<%= t('payments_col_promo') %>"><%= p.promo_code || '—' %></td>
-          <td data-label="<%= t('payments_col_change_status') %>">
-            <form method="POST" action="/admin/payments/<%= p.id %>/status" class="status-form">
-              <select name="status">
-                <% ['pending','paid','failed'].forEach(function (s) { %>
-                  <option value="<%= s %>" <%= p.status === s ? 'selected' : '' %>><%= s %></option>
-                <% }) %>
-              </select>
-              <button type="submit" class="btn btn-sm"><%= t('btn_save') %></button>
-            </form>
-          </td>
-        </tr>
-      <% }) %>
-      <% if (!payments.length) { %>
-        <tr><td colspan="7" class="empty-state no-stack"><%= t('payments_empty') %></td></tr>
+<div class="tab-panel" data-panel="profile">
+  <div class="card">
+    <div class="grid-2">
+      <div><span class="muted"><%= t('field_telegram_id') %></span><br><%= user.telegram_id %></div>
+      <div><span class="muted"><%= t('field_username') %></span><br><%= user.username ? '@' + user.username : '—' %></div>
+      <div><span class="muted"><%= t('field_phone') %></span><br><%= user.phone || '—' %></div>
+      <div><span class="muted"><%= t('field_language') %></span><br><%= user.language %></div>
+      <div>
+        <span class="muted"><%= t('field_status') %></span><br>
+        <span class="badge badge-<%= user.status %>"><%= t('status_' + user.status) %></span>
+        <% if (user.blocked_at) { %><span class="badge badge-blocked"><%= t('status_blocked') %></span><% } %>
+      </div>
+      <div><span class="muted"><%= t('field_registered') %></span><br><%= new Date(user.created_at).toLocaleString('ru-RU') %></div>
+      <div><span class="muted"><%= t('field_balance') %></span><br><b><%= Number(user.balance).toLocaleString('ru-RU') %> UZS</b></div>
+      <% if (user.blocked_at) { %>
+        <div><span class="muted"><%= t('field_blocked_since') %></span><br><%= new Date(user.blocked_at).toLocaleString('ru-RU') %></div>
       <% } %>
-    </tbody>
-  </table>
+      <% if (user.deleted_at) { %>
+        <div><span class="muted"><%= t('field_deleted_since') %></span><br><%= new Date(user.deleted_at).toLocaleString('ru-RU') %></div>
+      <% } %>
+    </div>
+
+    <div class="actions" style="margin-top:20px">
+      <% if (user.blocked_at) { %>
+        <form method="POST" action="/admin/users/<%= user.id %>/unblock">
+          <button type="submit" class="btn btn-primary"><%= t('btn_unblock') %></button>
+        </form>
+      <% } else { %>
+        <form method="POST" action="/admin/users/<%= user.id %>/block" onsubmit="return confirm('<%= t('confirm_block') %>');">
+          <button type="submit" class="btn btn-danger"><%= t('btn_block') %></button>
+        </form>
+      <% } %>
+
+      <% if (user.deleted_at) { %>
+        <form method="POST" action="/admin/users/<%= user.id %>/restore">
+          <button type="submit" class="btn btn-primary"><%= t('btn_restore') %></button>
+        </form>
+      <% } else { %>
+        <form method="POST" action="/admin/users/<%= user.id %>/delete" onsubmit="return confirm('<%= t('confirm_delete') %>');">
+          <button type="submit" class="btn btn-danger"><%= t('btn_delete') %></button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="grid-2" style="align-items:start;gap:16px">
+    <div class="card">
+      <div class="card-section-title" style="margin-bottom:12px"><%= t('section_balance') %></div>
+      <form method="POST" action="/admin/users/<%= user.id %>/balance/adjust">
+        <div class="field">
+          <label for="amount"><%= t('balance_adjust_amount_label') %></label>
+          <input type="number" id="amount" name="amount" step="0.01" required placeholder="50000" />
+        </div>
+        <div class="field">
+          <label for="reason"><%= t('balance_adjust_reason_label') %></label>
+          <input type="text" id="reason" name="reason" placeholder="Возврат / бонус / коррекция" />
+        </div>
+        <button type="submit" class="btn btn-primary"><%= t('btn_adjust_balance') %></button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-section-title" style="margin-bottom:12px"><%= t('section_status_override') %></div>
+      <p class="field-hint" style="margin-top:0"><%= t('status_override_hint') %></p>
+      <form method="POST" action="/admin/users/<%= user.id %>/status" class="status-form">
+        <select name="status">
+          <% ['new','pending','paid'].forEach(function (s) { %>
+            <option value="<%= s %>" <%= user.status === s ? 'selected' : '' %>><%= t('status_' + s) %></option>
+          <% }) %>
+        </select>
+        <button type="submit" class="btn btn-sm"><%= t('btn_change_user_status') %></button>
+      </form>
+    </div>
   </div>
 </div>
+
+<div class="tab-panel" data-panel="payments" hidden>
+  <div class="card" style="padding:0">
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th><%= t('payments_col_date') %></th>
+          <th><%= t('payments_col_provider') %></th>
+          <th><%= t('payments_col_purpose') %></th>
+          <th><%= t('payments_col_amount') %></th>
+          <th><%= t('payments_col_status') %></th>
+          <th><%= t('payments_col_promo') %></th>
+          <th><%= t('payments_col_change_status') %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% payments.forEach(function (p) { %>
+          <tr>
+            <td data-label="<%= t('payments_col_date') %>"><%= new Date(p.created_at).toLocaleString('ru-RU') %></td>
+            <td data-label="<%= t('payments_col_provider') %>"><%= p.provider %></td>
+            <td data-label="<%= t('payments_col_purpose') %>"><%= p.purpose === 'topup' ? t('purpose_topup') : t('purpose_purchase') %></td>
+            <td data-label="<%= t('payments_col_amount') %>"><%= Number(p.amount).toLocaleString('ru-RU') %> <%= p.currency %></td>
+            <td data-label="<%= t('payments_col_status') %>"><span class="badge badge-<%= p.status %>"><%= p.status %></span></td>
+            <td data-label="<%= t('payments_col_promo') %>"><%= p.promo_code || '—' %></td>
+            <td data-label="<%= t('payments_col_change_status') %>">
+              <form method="POST" action="/admin/payments/<%= p.id %>/status" class="status-form">
+                <select name="status">
+                  <% ['pending','paid','failed'].forEach(function (s) { %>
+                    <option value="<%= s %>" <%= p.status === s ? 'selected' : '' %>><%= s %></option>
+                  <% }) %>
+                </select>
+                <button type="submit" class="btn btn-sm"><%= t('btn_save') %></button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (!payments.length) { %>
+          <tr><td colspan="7" class="empty-state no-stack"><%= t('payments_empty') %></td></tr>
+        <% } %>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" data-panel="activity" hidden>
+  <div class="card" style="padding:0">
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th><%= t('logs_col_date') %></th>
+          <th><%= t('logs_col_admin') %></th>
+          <th><%= t('logs_col_action') %></th>
+          <th><%= t('logs_col_details') %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% activity.forEach(function (l) { %>
+          <tr>
+            <td data-label="<%= t('logs_col_date') %>"><%= new Date(l.created_at).toLocaleString('ru-RU') %></td>
+            <td data-label="<%= t('logs_col_admin') %>"><%= l.admin_login || t('logs_system') %></td>
+            <td data-label="<%= t('logs_col_action') %>"><%= l.action %></td>
+            <td data-label="<%= t('logs_col_details') %>" class="faint"><%= l.meta ? JSON.stringify(l.meta) : '' %></td>
+          </tr>
+        <% }) %>
+        <% if (!activity.length) { %>
+          <tr><td colspan="4" class="empty-state no-stack"><%= t('activity_empty') %></td></tr>
+        <% } %>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var btns = Array.prototype.slice.call(document.querySelectorAll('.tab-btn'));
+    var panels = Array.prototype.slice.call(document.querySelectorAll('.tab-panel'));
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btns.forEach(function (b) { b.classList.remove('active'); });
+        panels.forEach(function (p) { p.hidden = true; });
+        btn.classList.add('active');
+        var target = document.querySelector('.tab-panel[data-panel="' + btn.dataset.tab + '"]');
+        if (target) target.hidden = false;
+      });
+    });
+  })();
+</script>

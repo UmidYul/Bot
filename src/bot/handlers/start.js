@@ -26,7 +26,9 @@ async function promptForPhone(ctx, user) {
  * из /start, из смены языка и из пунктов меню, чтобы поведение везде было одинаковым.
  */
 async function routeExistingUser(ctx, user) {
-  if (user.status === 'blocked') {
+  // Бан — независимый флаг, а не значение status: проверяем его первым, чтобы
+  // заблокированный paid-юзер видел сообщение о блокировке, а не "уже оплачено".
+  if (user.blocked_at) {
     await ctx.reply(t(user.language, 'blocked'), html());
     return;
   }

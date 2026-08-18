@@ -45,4 +45,25 @@ async function creditBalance(user, amount, provider) {
   return updated;
 }
 
-module.exports = { setBot, creditBalance };
+/**
+ * Уведомляет юзера о ручной корректировке баланса из админки (см. POST
+ * /admin/users/:id/balance/adjust). amount может быть отрицательным (списание).
+ * @param {{telegram_id: number, language: string, balance: number}} user уже обновлённый
+ * @param {number} amount дельта (+ пополнение, - списание)
+ * @param {string} reason причина, указанная админом
+ */
+async function notifyBalanceAdjusted(user, amount, reason) {
+  if (!botRef) return;
+
+  try {
+    await botRef.telegram.sendMessage(
+      user.telegram_id,
+      t(user.language, 'balance_adjusted_by_admin', amount, user.balance, reason),
+      { parse_mode: 'HTML' }
+    );
+  } catch (err) {
+    console.error(`notifyBalanceAdjusted: не удалось уведомить юзера ${user.telegram_id}:`, err.message);
+  }
+}
+
+module.exports = { setBot, creditBalance, notifyBalanceAdjusted };

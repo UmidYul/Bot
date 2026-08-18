@@ -27,7 +27,7 @@ async function handleProfile(ctx) {
     `${t(lang, 'profile_code_label')}: <code>${user.code}</code>`,
     `${t(lang, 'profile_phone_label')}: ${user.phone || t(lang, 'profile_phone_missing')}`,
     `${t(lang, 'profile_language_label')}: ${lang === 'ru' ? '🇷🇺 Русский' : "🇺🇿 O'zbekcha"}`,
-    `${t(lang, 'profile_status_label')}: ${t(lang, `status_${user.status}`)}`,
+    `${t(lang, 'profile_status_label')}: ${t(lang, `status_${user.status}`)}${user.blocked_at ? ` (${t(lang, 'status_blocked')})` : ''}`,
     `${t(lang, 'profile_registered_label')}: ${formatDate(user.created_at)}`,
     `${t(lang, 'profile_balance_label')}: <b>${Number(user.balance).toLocaleString('ru-RU')} UZS</b>`,
     `${t(lang, 'profile_last_payment_label')}: ${lastPaid ? `${Number(lastPaid.amount).toLocaleString('ru-RU')} UZS (${formatDate(lastPaid.paid_at)})` : t(lang, 'profile_no_payments')}`,
@@ -38,7 +38,7 @@ async function handleProfile(ctx) {
     extra = html({
       reply_markup: { inline_keyboard: [[{ text: t(lang, 'open_channel_button'), url: config.channelInviteLink }]] },
     });
-  } else if (user.status !== 'blocked' && user.phone) {
+  } else if (!user.blocked_at && user.phone) {
     extra = html(paymentScreenKeyboard(lang));
   }
 

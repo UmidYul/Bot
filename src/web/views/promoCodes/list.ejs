@@ -5,7 +5,7 @@
 <% } %>
 
 <div class="toolbar">
-  <a href="/admin/promo-codes/new" class="btn btn-primary"><%= t('promo_new_button') %></a>
+  <a href="/admin/promo-codes/new" id="openCreateModal" class="btn btn-primary"><%= t('promo_new_button') %></a>
 </div>
 
 <div class="card" style="padding:0">
@@ -31,7 +31,22 @@
           <td data-label="<%= t('promo_col_used_limit') %>"><%= p.used_count %> / <%= p.max_uses != null ? p.max_uses : '∞' %></td>
           <td data-label="<%= t('promo_col_expires') %>"><%= p.expires_at ? new Date(p.expires_at).toLocaleDateString('ru-RU') : '—' %></td>
           <td data-label="<%= t('promo_col_active') %>"><%= p.is_active ? t('yes') : t('no') %></td>
-          <td class="no-stack"><a href="/admin/promo-codes/<%= p.id %>/edit"><%= t('promo_edit_link') %></a></td>
+          <td class="no-stack">
+            <div class="actions">
+              <a href="/admin/promo-codes/<%= p.id %>/edit" class="js-edit-promo" data-promo="<%- JSON.stringify({
+                id: p.id,
+                code: p.code,
+                type: p.type,
+                value: p.value,
+                max_uses: p.max_uses,
+                expires_at: p.expires_at ? new Date(p.expires_at).toISOString().slice(0, 10) : '',
+                is_active: p.is_active,
+              }).replace(/"/g, '&quot;') %>"><%= t('promo_edit_link') %></a>
+              <form method="POST" action="/admin/promo-codes/<%= p.id %>/toggle" class="inline-form">
+                <button type="submit" class="btn btn-sm"><%= p.is_active ? t('promo_deactivate') : t('promo_activate') %></button>
+              </form>
+            </div>
+          </td>
         </tr>
       <% }) %>
       <% if (!promoCodes.length) { %>
@@ -41,3 +56,149 @@
   </table>
   </div>
 </div>
+
+<div class="modal-backdrop" id="promoModal">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="promoModalTitle">
+    <div class="modal-header">
+      <h1 id="promoModalTitle"><%= t('promo_form_title_new') %></h1>
+      <button type="button" class="modal-close" id="promoModalClose" aria-label="<%= t('modal_close') %>">&times;</button>
+    </div>
+
+    <div class="flash flash-error" id="promoModalError" hidden></div>
+
+    <form id="promoForm" method="POST" action="/admin/promo-codes/new">
+      <div class="field">
+        <label for="modal_code"><%= t('promo_field_code') %></label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="modal_code" name="code" required style="flex:1;text-transform:uppercase" />
+          <button type="button" class="btn" id="promoRandomCode"><%= t('promo_random_button') %></button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="modal_type"><%= t('promo_field_type') %></label>
+        <select id="modal_type" name="type">
+          <option value="percent"><%= t('promo_type_percent') %></option>
+          <option value="fixed"><%= t('promo_type_fixed') %></option>
+          <option value="free"><%= t('promo_type_free') %></option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="modal_value"><%= t('promo_field_value') %></label>
+        <input type="number" id="modal_value" name="value" value="0" min="0" step="0.01" />
+      </div>
+
+      <div class="field">
+        <label for="modal_max_uses"><%= t('promo_field_max_uses') %></label>
+        <input type="number" id="modal_max_uses" name="max_uses" min="1" />
+      </div>
+
+      <div class="field">
+        <label for="modal_expires_at"><%= t('promo_field_expires_at') %></label>
+        <input type="date" id="modal_expires_at" name="expires_at" />
+      </div>
+
+      <div class="checkbox-row" id="promoActiveRow" hidden>
+        <input type="checkbox" id="modal_is_active" name="is_active" value="1" />
+        <label for="modal_is_active"><%= t('promo_field_active') %></label>
+      </div>
+
+      <div style="margin-top:24px">
+        <button type="submit" class="btn btn-primary"><%= t('btn_save') %></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var backdrop = document.getElementById('promoModal');
+    var form = document.getElementById('promoForm');
+    var errorBox = document.getElementById('promoModalError');
+    var titleEl = document.getElementById('promoModalTitle');
+    var activeRow = document.getElementById('promoActiveRow');
+    var TITLE_NEW = <%- JSON.stringify(t('promo_form_title_new')) %>;
+    var TITLE_EDIT = <%- JSON.stringify(t('promo_form_title_edit')) %>;
+
+    function openModal(mode, data) {
+      form.reset();
+      errorBox.hidden = true;
+      errorBox.textContent = '';
+
+      if (mode === 'edit' && data) {
+        form.action = '/admin/promo-codes/' + data.id + '/edit';
+        titleEl.textContent = TITLE_EDIT;
+        form.elements.code.value = data.code || '';
+        form.elements.type.value = data.type || 'percent';
+        form.elements.value.value = data.value != null ? data.value : 0;
+        form.elements.max_uses.value = data.max_uses != null ? data.max_uses : '';
+        form.elements.expires_at.value = data.expires_at || '';
+        form.elements.is_active.checked = Boolean(data.is_active);
+        activeRow.hidden = false;
+      } else {
+        form.action = '/admin/promo-codes/new';
+        titleEl.textContent = TITLE_NEW;
+        activeRow.hidden = true;
+      }
+
+      backdrop.classList.add('open');
+      form.elements.code.focus();
+    }
+
+    function closeModal() {
+      backdrop.classList.remove('open');
+    }
+
+    document.getElementById('openCreateModal').addEventListener('click', function (e) {
+      e.preventDefault();
+      openModal('create');
+    });
+
+    Array.prototype.slice.call(document.querySelectorAll('.js-edit-promo')).forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        openModal('edit', JSON.parse(link.dataset.promo));
+      });
+    });
+
+    document.getElementById('promoModalClose').addEventListener('click', closeModal);
+    backdrop.addEventListener('click', function (e) {
+      if (e.target === backdrop) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && backdrop.classList.contains('open')) closeModal();
+    });
+
+    document.getElementById('promoRandomCode').addEventListener('click', function () {
+      form.elements.code.value = Math.random().toString(36).slice(2, 8).toUpperCase();
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var body = new URLSearchParams(new FormData(form));
+      fetch(form.action, {
+        method: 'POST',
+        body: body,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then(function (res) {
+          return res.json().then(function (data) {
+            return { ok: res.ok, data: data };
+          });
+        })
+        .then(function (result) {
+          if (result.data.ok) {
+            window.location.href = result.data.redirect;
+          } else {
+            errorBox.textContent = result.data.error || 'Ошибка';
+            errorBox.hidden = false;
+          }
+        })
+        .catch(function () {
+          errorBox.textContent = 'Ошибка сети, попробуйте ещё раз.';
+          errorBox.hidden = false;
+        });
+    });
+  })();
+</script>
