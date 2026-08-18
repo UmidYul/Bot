@@ -25,10 +25,18 @@ module.exports = {
   choose_payment_method: "To'lov usulini tanlang:",
   pay_click: '💳 Click',
   pay_payme: '💳 Payme',
+  pay_balance: (balance) => `💰 Mening hisobim (${formatAmount(balance)} UZS)`,
   payme_disabled: "Payme vaqtincha mavjud emas. Iltimos, Click orqali to'lang.",
   payment_created: (amount, merchantTransId) =>
     `<b>Hisob yaratildi</b>\nSumma: <b>${formatAmount(amount)} UZS</b>\nTo'lov raqami: <code>${merchantTransId}</code>\n\nProvayder ulangach, bu yerda to'lov havolasi paydo bo'ladi.`,
   payment_link: (url) => `To'lash uchun havolaga o'ting:\n${url}`,
+  cancel_payment_prompt: "Fikringizdan qaytsangiz — bekor qilib, boshqa usulni tanlashingiz mumkin.",
+  payment_cancelled: "To'lov bekor qilindi. Boshqa usulni tanlashingiz mumkin.",
+
+  balance_insufficient: (balance, needed, shortfall) =>
+    `⚠️ Hisobingizda mablag' yetarli emas.\n\nBalans: <b>${formatAmount(balance)} UZS</b>\nKerak: <b>${formatAmount(needed)} UZS</b>\nYetishmayapti: <b>${formatAmount(shortfall)} UZS</b>\n\nBalansni to'ldirish uchun Click yoki Payme ilovasini to'g'ridan-to'g'ri oching va kodingizni kiriting (/profile ga qarang).`,
+  balance_topped_up: (amount, newBalance) =>
+    `💰 <b>Balans ${formatAmount(amount)} UZS ga to'ldirildi</b>\nJoriy balans: <b>${formatAmount(newBalance)} UZS</b>\n\nKanalga kirish huquqini olish uchun menyuga qaytib, «Mening hisobim» to'lov usulini tanlang.`,
 
   invoice_title: 'Kanalga kirish',
   invoice_description: "Yopiq kanalga kirish huquqi uchun to'lov",
@@ -45,6 +53,7 @@ module.exports = {
   receipt_promo_label: 'Promokod',
   provider_click: 'Click',
   provider_payme: 'Payme',
+  provider_balance: 'Mening hisobim',
   provider_promo: 'Promokod (bepul)',
 
   already_paid: "✅ Sizda kanalga kirish huquqi allaqachon bor. Agar havola yo'qolgan bo'lsa, u yana shu yerda:",
@@ -64,12 +73,12 @@ module.exports = {
 
   profile_title: '👤 <b>Sizning profilingiz</b>',
   profile_code_label: '🆔 Kod (hisob raqami)',
-  profile_code_hint: "Bu kodni Click ilovasi orqali qo'lda to'lov qilish uchun ishlatishingiz mumkin — uni hisob raqami / to'lov izohi sifatida kiriting.",
   profile_phone_label: '📱 Telefon',
   profile_phone_missing: "ko'rsatilmagan",
   profile_language_label: '🌐 Til',
   profile_status_label: '📌 Holat',
   profile_registered_label: "📅 Ro'yxatdan o'tgan",
+  profile_balance_label: '💰 Balans',
   profile_last_payment_label: "💳 Oxirgi to'lov",
   profile_no_payments: "hali to'lovlar yo'q",
 
@@ -83,7 +92,8 @@ module.exports = {
     "/start — boshlash / asosiy menyuga qaytish\n" +
     "/profile — profilingiz va qo'lda to'lov uchun kod\n" +
     "/help — shu yordam matni\n\n" +
-    "Ekran pastidagi menyu tugmalari komandalar bilan bir xil ishlaydi. Agar biror narsa noto'g'ri ketsa — shunchaki /start yuboring.",
+    "Ekran pastidagi menyu tugmalari komandalar bilan bir xil ishlaydi. Agar biror narsa noto'g'ri ketsa — shunchaki /start yuboring.\n\n" +
+    "💡 Profildagi kodni Click ilovasi orqali balansni to'g'ridan-to'g'ri to'ldirish uchun ishlatishingiz mumkin — uni hisob raqami sifatida kiriting. Balans avtomatik to'ldiriladi, keyin botda «Mening hisobim» to'lov usuli orqali kirish huquqini olishingiz mumkin.",
 
   need_phone_first: 'Avval telefon raqamingizni ulashing — pastdagi tugmani bosing.',
 

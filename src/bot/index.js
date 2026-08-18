@@ -14,6 +14,7 @@ const {
   handlePromoCancel,
   handlePayStart,
   handlePayBack,
+  handlePayCancel,
   handlePromoCodeText,
   handlePayMethod,
 } = require('./handlers/payment');
@@ -21,6 +22,7 @@ const { handleChatJoinRequest } = require('./handlers/joinRequest');
 const accessService = require('../services/accessService');
 const receiptService = require('../services/receiptService');
 const adminNotifyService = require('../services/adminNotifyService');
+const balanceService = require('../services/balanceService');
 const telegramPayments = require('../payments/telegramPayments');
 const { languageKeyboard } = require('./keyboards');
 
@@ -28,6 +30,7 @@ const bot = new Telegraf(config.botToken || 'invalid-token-placeholder');
 accessService.setBot(bot);
 receiptService.setBot(bot);
 adminNotifyService.setBot(bot);
+balanceService.setBot(bot);
 
 bot.telegram
   .setMyCommands([
@@ -71,7 +74,8 @@ bot.action('promo:enter', handleEnterPromo);
 bot.action('promo:cancel', handlePromoCancel);
 bot.action('pay:start', handlePayStart);
 bot.action('pay:back', handlePayBack);
-bot.action(/^pay:method:(click|payme)$/, handlePayMethod);
+bot.action('pay:cancel', handlePayCancel);
+bot.action(/^pay:method:(click|payme|balance)$/, handlePayMethod);
 
 bot.on('contact', handleContact);
 

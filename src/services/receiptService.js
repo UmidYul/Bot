@@ -7,7 +7,12 @@ function setBot(bot) {
   botRef = bot;
 }
 
-const PROVIDER_LABEL_KEY = { click: 'provider_click', payme: 'provider_payme', promo: 'provider_promo' };
+const PROVIDER_LABEL_KEY = {
+  click: 'provider_click',
+  payme: 'provider_payme',
+  balance: 'provider_balance',
+  promo: 'provider_promo',
+};
 
 /**
  * Отправляет юзеру чек сразу после успешной оплаты — вызывается из всех путей

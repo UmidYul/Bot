@@ -27,10 +27,18 @@ module.exports = {
   choose_payment_method: 'Выберите способ оплаты:',
   pay_click: '💳 Click',
   pay_payme: '💳 Payme',
+  pay_balance: (balance) => `💰 Мой счёт (${formatAmount(balance)} UZS)`,
   payme_disabled: 'Payme временно недоступен. Пожалуйста, оплатите через Click.',
   payment_created: (amount, merchantTransId) =>
     `<b>Счёт создан</b>\nСумма: <b>${formatAmount(amount)} UZS</b>\nНомер платежа: <code>${merchantTransId}</code>\n\nСсылка на оплату появится здесь после подключения провайдера.`,
   payment_link: (url) => `Для оплаты перейдите по ссылке:\n${url}`,
+  cancel_payment_prompt: 'Если передумали — можно отменить и выбрать другой способ.',
+  payment_cancelled: 'Оплата отменена. Можно выбрать другой способ.',
+
+  balance_insufficient: (balance, needed, shortfall) =>
+    `⚠️ На балансе недостаточно средств.\n\nБаланс: <b>${formatAmount(balance)} UZS</b>\nНужно: <b>${formatAmount(needed)} UZS</b>\nНе хватает: <b>${formatAmount(shortfall)} UZS</b>\n\nПополнить баланс можно, открыв приложение Click или Payme напрямую и введя там свой код (смотрите /profile).`,
+  balance_topped_up: (amount, newBalance) =>
+    `💰 <b>Баланс пополнен на ${formatAmount(amount)} UZS</b>\nТекущий баланс: <b>${formatAmount(newBalance)} UZS</b>\n\nЧтобы получить доступ к каналу, вернитесь в меню и выберите способ оплаты «Мой счёт».`,
 
   invoice_title: 'Доступ к каналу',
   invoice_description: 'Оплата доступа к закрытому каналу',
@@ -47,6 +55,7 @@ module.exports = {
   receipt_promo_label: 'Промокод',
   provider_click: 'Click',
   provider_payme: 'Payme',
+  provider_balance: 'Мой счёт',
   provider_promo: 'Промокод (бесплатно)',
 
   already_paid: '✅ У вас уже есть доступ к каналу. Если ссылка потерялась — вот она снова:',
@@ -66,13 +75,12 @@ module.exports = {
 
   profile_title: '👤 <b>Ваш профиль</b>',
   profile_code_label: '🆔 Код (лицевой счёт)',
-  profile_code_hint:
-    'Этот код можно использовать, чтобы оплатить доступ вручную через приложение Click — впишите его как номер лицевого счёта / комментарий к платежу.',
   profile_phone_label: '📱 Телефон',
   profile_phone_missing: 'не указан',
   profile_language_label: '🌐 Язык',
   profile_status_label: '📌 Статус',
   profile_registered_label: '📅 Регистрация',
+  profile_balance_label: '💰 Баланс',
   profile_last_payment_label: '💳 Последний платёж',
   profile_no_payments: 'платежей ещё не было',
 
@@ -86,7 +94,8 @@ module.exports = {
     '/start — начать / вернуться в главное меню\n' +
     '/profile — ваш профиль и код для ручной оплаты\n' +
     '/help — эта справка\n\n' +
-    'Кнопки меню внизу экрана работают так же, как команды. Если что-то пошло не так — просто отправьте /start.',
+    'Кнопки меню внизу экрана работают так же, как команды. Если что-то пошло не так — просто отправьте /start.\n\n' +
+    '💡 Код из профиля можно использовать, чтобы пополнить баланс напрямую через приложение Click — впишите его как номер лицевого счёта. Баланс зачислится автоматически, а доступ потом можно получить в боте способом оплаты «Мой счёт».',
 
   need_phone_first: 'Сначала поделитесь номером телефона — нажмите кнопку ниже.',
 

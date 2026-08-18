@@ -42,13 +42,26 @@ function promoEntryKeyboard(lang) {
   return Markup.inlineKeyboard([[Markup.button.callback(t(lang, 'cancel_button'), 'promo:cancel')]]);
 }
 
-/** Показывает только реально включённые провайдеры (см. config.enabledPaymentProviders). */
-function paymentMethodKeyboard(lang) {
+/**
+ * Показывает реально включённые внешние провайдеры (см. config.enabledPaymentProviders) —
+ * это ПРЯМАЯ покупка, доступ выдаётся сразу по завершении. "Мой счёт" — отдельная строка,
+ * всегда показывается: списание с баланса, накопленного через "оплату как за коммуналку"
+ * (юзер платил напрямую в приложении провайдера по коду, минуя бота).
+ */
+function paymentMethodKeyboard(lang, balance) {
   const buttons = config.enabledPaymentProviders.map((provider) =>
     Markup.button.callback(t(lang, `pay_${provider}`), `pay:method:${provider}`)
   );
 
-  return Markup.inlineKeyboard([buttons, [Markup.button.callback(t(lang, 'back_button'), 'pay:back')]]);
+  return Markup.inlineKeyboard([
+    buttons,
+    [Markup.button.callback(t(lang, 'pay_balance', balance), 'pay:method:balance')],
+    [Markup.button.callback(t(lang, 'back_button'), 'pay:back')],
+  ]);
+}
+
+function cancelPaymentKeyboard(lang) {
+  return Markup.inlineKeyboard([[Markup.button.callback(t(lang, 'cancel_button'), 'pay:cancel')]]);
 }
 
 module.exports = {
@@ -59,4 +72,5 @@ module.exports = {
   paymentScreenKeyboard,
   promoEntryKeyboard,
   paymentMethodKeyboard,
+  cancelPaymentKeyboard,
 };

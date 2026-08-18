@@ -54,6 +54,29 @@ function unblockUser(id) {
   return updateStatus(id, 'new');
 }
 
+/** Пополнение баланса — просто прибавляет, гонки тут не критичны (только зачисление). */
+async function incrementBalance(id, amount) {
+  const [user] = await db('users')
+    .where({ id })
+    .update({ balance: db.raw('balance + ?', [amount]), updated_at: db.fn.now() })
+    .returning('*');
+  return user;
+}
+
+/**
+ * Атомарное списание с баланса — условие balance >= amount проверяется в том же UPDATE,
+ * что и вычитание, поэтому под конкурентной нагрузкой (например, двойной тап на "Мой счёт")
+ * баланс не может уйти в минус. Возвращает undefined, если средств не хватило.
+ */
+async function deductBalance(id, amount) {
+  const [user] = await db('users')
+    .where({ id })
+    .andWhere('balance', '>=', amount)
+    .update({ balance: db.raw('balance - ?', [amount]), updated_at: db.fn.now() })
+    .returning('*');
+  return user;
+}
+
 /**
  * @param {{q?: string, status?: string}} filters
  * @param {{page?: number, pageSize?: number}} pagination
@@ -91,7 +114,7 @@ async function listUsers(filters = {}, pagination = {}) {
     .joinRaw(
       `LEFT JOIN LATERAL (
         SELECT * FROM payments
-        WHERE payments.user_id = users.id
+        WHERE payments.user_id = users.id AND payments.purpose = 'purchase'
         ORDER BY payments.created_at DESC
         LIMIT 1
       ) lp ON true`
@@ -115,5 +138,7 @@ module.exports = {
   updateUsername,
   blockUser,
   unblockUser,
+  incrementBalance,
+  deductBalance,
   listUsers,
 };

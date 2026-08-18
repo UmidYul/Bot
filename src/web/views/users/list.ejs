@@ -27,6 +27,7 @@
         <th><%= t('users_col_phone') %></th>
         <th><%= t('users_col_language') %></th>
         <th><%= t('users_col_status') %></th>
+        <th><%= t('users_col_balance') %></th>
         <th><%= t('users_col_last_payment') %></th>
         <th><%= t('users_col_date') %></th>
         <th><%= t('users_col_provider') %></th>
@@ -41,6 +42,7 @@
           <td data-label="<%= t('users_col_phone') %>"><%= u.phone || '—' %></td>
           <td data-label="<%= t('users_col_language') %>"><%= u.language %></td>
           <td data-label="<%= t('users_col_status') %>"><span class="badge badge-<%= u.status %>"><%= t('status_' + u.status) %></span></td>
+          <td data-label="<%= t('users_col_balance') %>"><%= Number(u.balance).toLocaleString('ru-RU') %> UZS</td>
           <td data-label="<%= t('users_col_last_payment') %>"><%= u.last_payment_amount != null ? Number(u.last_payment_amount).toLocaleString('ru-RU') + ' UZS' : '—' %></td>
           <td data-label="<%= t('users_col_date') %>"><%= u.last_payment_date ? new Date(u.last_payment_date).toLocaleString('ru-RU') : '—' %></td>
           <td data-label="<%= t('users_col_provider') %>"><%= u.last_payment_provider || '—' %></td>
@@ -48,7 +50,7 @@
         </tr>
       <% }) %>
       <% if (!users.length) { %>
-        <tr><td colspan="9" class="empty-state no-stack"><%= t('users_empty') %></td></tr>
+        <tr><td colspan="10" class="empty-state no-stack"><%= t('users_empty') %></td></tr>
       <% } %>
     </tbody>
   </table>

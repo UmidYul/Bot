@@ -5,6 +5,7 @@ const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
 const { notifyNewPayment } = require('../services/adminNotifyService');
+const { creditBalance } = require('../services/balanceService');
 
 // Стандартные коды ошибок Payme Merchant API.
 const ERROR = {
@@ -93,18 +94,19 @@ async function checkPerformTransaction(params) {
   const resolved = await resolveAccount(params.account);
   if (!resolved) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
 
-  // На этом шаге платёж в БД может ещё не существовать (юзер только проверяет возможность
-  // оплаты по коду) — читаем ожидаемую сумму либо из уже созданного payment, либо
-  // используем текущую цену канала для ещё не заведённого "ручного" платежа.
-  const amount = resolved.payment ? resolved.payment.amount : config.channelPrice;
-  const status = resolved.payment ? resolved.payment.status : 'pending';
-
   await logEvent(resolved.payment ? resolved.payment.id : null, 'CheckPerformTransaction', params);
 
-  if (status !== 'pending') {
-    throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
-  }
-  if (!amountsMatch(amount, params.amount)) {
+  if (resolved.payment) {
+    // Платёж уже заведён ботом (прямая покупка) — сумма должна совпадать с ожидаемой.
+    if (resolved.payment.status !== 'pending') {
+      throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
+    }
+    if (!amountsMatch(resolved.payment.amount, params.amount)) {
+      throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
+    }
+  } else if (!(Number(params.amount) > 0)) {
+    // Платёж ещё не существует — это пополнение баланса по коду напрямую, минуя бота.
+    // Фиксированной цены для проверки нет, сумма может быть любой положительной.
     throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
   }
 
@@ -119,15 +121,17 @@ async function createTransaction(params) {
     if (!resolved) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
 
     // Платёж по коду ещё не заведён в БД — юзер платит вручную через приложение Payme,
-    // минуя бота. Создаём платёж на лету по текущей цене канала.
+    // минуя бота. Заводим пополнение баланса на лету суммой, которую Payme прислал
+    // (params.amount в тийинах — переводим в сумы).
     payment =
       resolved.payment ||
       (await paymentsRepo.createPayment({
         userId: resolved.user.id,
         provider: 'payme',
-        amount: config.channelPrice,
+        amount: Number(params.amount) / 100,
         merchantTransId: resolved.merchantTransId,
         status: 'pending',
+        purpose: 'topup',
       }));
 
     await logEvent(payment.id, 'CreateTransaction', params);
@@ -181,11 +185,19 @@ async function performTransaction(params) {
 
   const paidAt = new Date();
   const updated = await paymentsRepo.markPaid(payment.id, { paidAt });
-  if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
-  const user = await usersRepo.updateStatus(payment.user_id, 'paid');
-  await grantAccess(user);
-  await sendReceipt(user, updated);
-  await notifyNewPayment(user, updated);
+
+  if (payment.purpose === 'topup') {
+    // Оплата напрямую в приложении Payme по коду, минуя бота — зачисляем на баланс,
+    // доступ НЕ выдаём (это отдельное явное действие через "Мой счёт" в боте).
+    const user = await usersRepo.findById(payment.user_id);
+    await creditBalance(user, updated.amount, 'payme');
+  } else {
+    if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
+    const user = await usersRepo.updateStatus(payment.user_id, 'paid');
+    await grantAccess(user);
+    await sendReceipt(user, updated);
+    await notifyNewPayment(user, updated);
+  }
 
   return {
     transaction: String(updated.id),

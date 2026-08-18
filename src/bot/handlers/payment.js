@@ -11,7 +11,12 @@ const { buildPaymeCheckoutUrl } = require('../../payments/payme.linkBuilder');
 const telegramPayments = require('../../payments/telegramPayments');
 const { t } = require('../i18n');
 const { html } = require('../reply');
-const { paymentScreenKeyboard, paymentMethodKeyboard, promoEntryKeyboard } = require('../keyboards');
+const {
+  paymentScreenKeyboard,
+  paymentMethodKeyboard,
+  promoEntryKeyboard,
+  cancelPaymentKeyboard,
+} = require('../keyboards');
 const { showPaymentScreen, routeExistingUser } = require('./start');
 
 function resetPaymentSession(ctx) {
@@ -42,8 +47,8 @@ async function guardActionable(ctx, user) {
   return true;
 }
 
-async function showPaymentMethodScreen(ctx, lang) {
-  await ctx.reply(t(lang, 'choose_payment_method'), html(paymentMethodKeyboard(lang)));
+async function showPaymentMethodScreen(ctx, user) {
+  await ctx.reply(t(user.language, 'choose_payment_method'), html(paymentMethodKeyboard(user.language, user.balance)));
 }
 
 async function handleEnterPromo(ctx) {
@@ -74,15 +79,9 @@ async function handlePayStart(ctx) {
   ctx.session.finalAmount = config.channelPrice;
 
   await ctx.answerCbQuery();
-
-  // Если подключён только один способ оплаты — не заставляем юзера выбирать из одного
-  // варианта, сразу переходим к оплате.
-  if (config.enabledPaymentProviders.length === 1) {
-    await initiatePayment(ctx, user, config.enabledPaymentProviders[0]);
-    return;
-  }
-
-  await showPaymentMethodScreen(ctx, user.language);
+  // "Мой счёт" — всегда полноценная альтернатива внешним провайдерам, поэтому экран выбора
+  // способа показываем всегда, даже если внешний провайдер ровно один.
+  await showPaymentMethodScreen(ctx, user);
 }
 
 async function handlePayBack(ctx) {
@@ -140,13 +139,7 @@ async function handlePromoCodeText(ctx) {
   }
 
   await ctx.reply(t(user.language, 'promo_applied', finalAmount), html());
-
-  if (config.enabledPaymentProviders.length === 1) {
-    await initiatePayment(ctx, user, config.enabledPaymentProviders[0]);
-    return;
-  }
-
-  await showPaymentMethodScreen(ctx, user.language);
+  await showPaymentMethodScreen(ctx, user);
 }
 
 async function grantFreeAccess(ctx, user, promo) {
@@ -183,7 +176,13 @@ async function handlePayMethod(ctx) {
   const user = ctx.state.user;
   if (!(await guardActionable(ctx, user))) return;
 
-  const provider = ctx.match[1]; // 'click' | 'payme'
+  const provider = ctx.match[1]; // 'click' | 'payme' | 'balance'
+
+  if (provider === 'balance') {
+    await ctx.answerCbQuery();
+    await handlePayBalance(ctx, user);
+    return;
+  }
 
   if (provider === 'payme' && !config.payme.enabled) {
     await ctx.answerCbQuery();
@@ -193,6 +192,52 @@ async function handlePayMethod(ctx) {
 
   await ctx.answerCbQuery();
   await initiatePayment(ctx, user, provider);
+}
+
+/**
+ * "Мой счёт" — прямая покупка доступа списанием с баланса, накопленного через оплату
+ * напрямую в приложении провайдера по коду (см. resolveOrCreatePayment/resolveAccount
+ * в click.js/payme.js). Никакого внешнего провайдера здесь не задействуется.
+ */
+async function handlePayBalance(ctx, user) {
+  const amount = ctx.session.finalAmount || config.channelPrice;
+
+  const deducted = await usersRepo.deductBalance(user.id, amount);
+  if (!deducted) {
+    const shortfall = Math.max(0, amount - Number(user.balance));
+    await ctx.reply(t(user.language, 'balance_insufficient', user.balance, amount, shortfall), html());
+    return;
+  }
+
+  const merchantTransId = `${user.code}-${Date.now()}`;
+  const payment = await paymentsRepo.createPayment({
+    userId: user.id,
+    provider: 'balance',
+    amount,
+    promoCodeId: ctx.session.promoCodeId || null,
+    merchantTransId,
+    status: 'paid',
+  });
+  const paid = await paymentsRepo.markPaid(payment.id);
+  if (ctx.session.promoCodeId) await promoCodesRepo.incrementUsage(ctx.session.promoCodeId);
+
+  const updatedUser = await usersRepo.updateStatus(user.id, 'paid');
+  ctx.state.user = updatedUser;
+  resetPaymentSession(ctx);
+
+  await grantAccess(updatedUser);
+  await sendReceipt(updatedUser, paid);
+  await notifyNewPayment(updatedUser, paid);
+}
+
+async function handlePayCancel(ctx) {
+  const user = ctx.state.user;
+  if (!user) return;
+
+  await ctx.answerCbQuery();
+  resetPaymentSession(ctx);
+  await ctx.reply(t(user.language, 'payment_cancelled'));
+  await showPaymentScreen(ctx, user);
 }
 
 async function initiatePayment(ctx, user, provider) {
@@ -214,6 +259,7 @@ async function initiatePayment(ctx, user, provider) {
   // юзер оплачивает прямо во встроенном чек-ауте Telegram, без перехода по ссылке.
   if (provider === 'click' && telegramPayments.isConfigured()) {
     await telegramPayments.sendInvoice(ctx, payment, user);
+    await ctx.reply(t(user.language, 'cancel_payment_prompt'), html(cancelPaymentKeyboard(user.language)));
     return;
   }
 
@@ -223,12 +269,15 @@ async function initiatePayment(ctx, user, provider) {
   if (!hasRealCreds) {
     // Реальных merchant-данных провайдера ещё нет (см. .env.example) — показываем номер
     // платежа текстом, чтобы можно было протестировать всё до касс Click/Payme.
-    await ctx.reply(t(user.language, 'payment_created', amount, payment.merchant_trans_id), html());
+    await ctx.reply(
+      t(user.language, 'payment_created', amount, payment.merchant_trans_id),
+      html(cancelPaymentKeyboard(user.language))
+    );
     return;
   }
 
   const url = provider === 'click' ? buildClickPayUrl(payment, user) : buildPaymeCheckoutUrl(payment, user);
-  await ctx.reply(t(user.language, 'payment_link', url));
+  await ctx.reply(t(user.language, 'payment_link', url), html(cancelPaymentKeyboard(user.language)));
 }
 
 module.exports = {
@@ -236,6 +285,7 @@ module.exports = {
   handlePromoCancel,
   handlePayStart,
   handlePayBack,
+  handlePayCancel,
   handlePromoCodeText,
   handlePayMethod,
   resetPaymentSession,
