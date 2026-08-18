@@ -6,6 +6,7 @@ const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
 const { notifyNewPayment } = require('../services/adminNotifyService');
 const { t } = require('../bot/i18n');
+const { closeScreen } = require('../bot/screen');
 
 /**
  * Telegram Payments (провайдер подключается через BotFather -> /mybots -> Payments) —
@@ -97,6 +98,7 @@ async function handleSuccessfulPayment(ctx) {
   const user = await usersRepo.updateStatus(payment.user_id, 'paid');
   ctx.state.user = user;
 
+  await closeScreen(ctx);
   await ctx.reply(t(user.language, 'payment_success'));
   await grantAccess(user);
   await sendReceipt(user, paid);

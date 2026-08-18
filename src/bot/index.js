@@ -23,6 +23,7 @@ const accessService = require('../services/accessService');
 const receiptService = require('../services/receiptService');
 const adminNotifyService = require('../services/adminNotifyService');
 const balanceService = require('../services/balanceService');
+const broadcastService = require('../services/broadcastService');
 const telegramPayments = require('../payments/telegramPayments');
 const { languageKeyboard } = require('./keyboards');
 
@@ -31,6 +32,7 @@ accessService.setBot(bot);
 receiptService.setBot(bot);
 adminNotifyService.setBot(bot);
 balanceService.setBot(bot);
+broadcastService.setBot(bot);
 
 bot.telegram
   .setMyCommands([
@@ -55,6 +57,7 @@ bot.use(
       finalAmount: config.channelPrice,
       promoInvalidAttempts: 0,
       promoLockedUntil: null,
+      screenMessageId: null,
     }),
   })
 );

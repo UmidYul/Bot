@@ -13,6 +13,7 @@
   --primary-dark: #4338ca;
   --primary-soft: #eef0fe;
   --danger: #dc2626;
+  --danger-dark: #b91c1c;
   --danger-soft: #fef1f1;
   --success: #16a34a;
   --success-soft: #eefdf3;
@@ -517,7 +518,12 @@ label:first-child {
   color: #fff;
 }
 .btn-danger:hover {
-  opacity: 0.92;
+  /* Явный background обязателен: у .btn:hover тот же вес специфичности (.class + :hover),
+     и без этой перебивки его neutral-soft (светло-серый) выигрывает по порядку объявления
+     в файле — кнопка на hover становится блёкло-серой с белым текстом почти без контраста
+     (тот же класс проблемы, что уже чинили для .btn-primary:hover). */
+  background: var(--danger-dark);
+  border-color: var(--danger-dark);
   color: #fff;
 }
 .btn-sm {

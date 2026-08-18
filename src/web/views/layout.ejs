@@ -18,6 +18,7 @@
         <a href="/admin/users" class="<%= typeof active !== 'undefined' && active === 'users' ? 'active' : '' %>"><%= t('nav_users') %></a>
         <a href="/admin/promo-codes" class="<%= typeof active !== 'undefined' && active === 'promo-codes' ? 'active' : '' %>"><%= t('nav_promo_codes') %></a>
         <a href="/admin/logs" class="<%= typeof active !== 'undefined' && active === 'logs' ? 'active' : '' %>"><%= t('nav_logs') %></a>
+        <a href="/admin/broadcast" class="<%= typeof active !== 'undefined' && active === 'broadcast' ? 'active' : '' %>"><%= t('nav_broadcast') %></a>
         <a href="/admin/settings" class="<%= typeof active !== 'undefined' && active === 'settings' ? 'active' : '' %>"><%= t('nav_settings') %></a>
       </nav>
       <div class="topbar-right">
@@ -34,6 +35,17 @@
   <div class="container page-enter">
     <%- body %>
   </div>
+
+  <div class="modal-backdrop" id="confirmModalBackdrop">
+    <div class="modal-panel" role="alertdialog" aria-modal="true" aria-labelledby="confirmModalMessage" style="max-width:420px">
+      <p id="confirmModalMessage" style="margin:0 0 20px;font-size:14.5px;line-height:1.5"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn" id="confirmModalCancel"><%= t('confirm_cancel') %></button>
+        <button type="button" class="btn btn-danger" id="confirmModalOk"><%= t('confirm_ok') %></button>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function () {
       var toggle = document.getElementById('menuToggle');
@@ -43,6 +55,63 @@
           topbar.classList.toggle('nav-open');
         });
       }
+    })();
+
+    /**
+     * Замена нативного window.confirm() на попап в стиле остальной админки — браузерные
+     * диалоги не поддаются кастомизации (нельзя даже поправить дизайн/шрифт) и на некоторых
+     * платформах выглядят как "предупреждение", а не часть приложения.
+     * Использование: либо <form data-confirm="Текст вопроса">, либо
+     * window.AdminConfirm.open('Текст', function () { ...действие... }).
+     */
+    window.AdminConfirm = (function () {
+      var backdrop = document.getElementById('confirmModalBackdrop');
+      var messageEl = document.getElementById('confirmModalMessage');
+      var okBtn = document.getElementById('confirmModalOk');
+      var cancelBtn = document.getElementById('confirmModalCancel');
+      var currentOnOk = null;
+
+      function open(message, onOk) {
+        messageEl.textContent = message;
+        currentOnOk = onOk;
+        backdrop.classList.add('open');
+        okBtn.focus();
+      }
+
+      function close() {
+        backdrop.classList.remove('open');
+        currentOnOk = null;
+      }
+
+      okBtn.addEventListener('click', function () {
+        var callback = currentOnOk;
+        close();
+        if (callback) callback();
+      });
+      cancelBtn.addEventListener('click', close);
+      backdrop.addEventListener('click', function (e) {
+        if (e.target === backdrop) close();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && backdrop.classList.contains('open')) close();
+      });
+
+      // Делегированный перехват форм с data-confirm — большинство подтверждений в
+      // админке это одна и та же пара "форма + вопрос", без этого пришлось бы писать
+      // одинаковый JS на каждой странице.
+      document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (form instanceof HTMLFormElement && form.hasAttribute('data-confirm') && !form.dataset.confirmed) {
+          e.preventDefault();
+          open(form.getAttribute('data-confirm'), function () {
+            form.dataset.confirmed = '1';
+            if (form.requestSubmit) form.requestSubmit();
+            else form.submit();
+          });
+        }
+      });
+
+      return { open: open, close: close };
     })();
   </script>
 </body>

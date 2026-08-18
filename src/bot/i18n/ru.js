@@ -17,7 +17,6 @@ module.exports = {
   pay_button: '💳 Оплатить',
   enter_promo_prompt: 'Введите промокод одним сообщением:',
   cancel_button: '✖️ Отмена',
-  promo_cancelled: 'Ввод промокода отменён.',
   promo_invalid: '⚠️ Промокод недействителен, истёк или уже использован. Попробуйте другой или переходите к оплате.',
   promo_locked: (minutes) => `🚫 Слишком много неверных попыток. Попробуйте ввести промокод снова через ${minutes} мин.`,
   promo_applied: (finalAmount) => `✅ Промокод применён! Итоговая сумма: <b>${formatAmount(finalAmount)} UZS</b>.`,
@@ -33,7 +32,6 @@ module.exports = {
     `<b>Счёт создан</b>\nСумма: <b>${formatAmount(amount)} UZS</b>\nНомер платежа: <code>${merchantTransId}</code>\n\nСсылка на оплату появится здесь после подключения провайдера.`,
   payment_link: (url) => `Для оплаты перейдите по ссылке:\n${url}`,
   cancel_payment_prompt: 'Если передумали — можно отменить и выбрать другой способ.',
-  payment_cancelled: 'Оплата отменена. Можно выбрать другой способ.',
 
   balance_insufficient: (balance, needed, shortfall) =>
     `⚠️ На балансе недостаточно средств.\n\nБаланс: <b>${formatAmount(balance)} UZS</b>\nНужно: <b>${formatAmount(needed)} UZS</b>\nНе хватает: <b>${formatAmount(shortfall)} UZS</b>\n\nПополнить баланс можно, открыв приложение Click или Payme напрямую и введя там свой код (смотрите /profile).`,

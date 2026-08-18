@@ -1,10 +1,14 @@
 module.exports = {
-  app_name: 'TG Sub Bot',
+  app_name: 'Topdim Uz',
   nav_users: 'Foydalanuvchilar',
   nav_promo_codes: 'Promokodlar',
   nav_logs: 'Loglar',
+  nav_broadcast: 'Xabar yuborish',
   nav_settings: 'Sozlamalar',
   logout: 'Chiqish',
+
+  confirm_ok: 'Tasdiqlash',
+  confirm_cancel: 'Bekor qilish',
 
   login_title: 'Admin panelga kirish',
   login_field_login: 'Login',
@@ -119,6 +123,19 @@ module.exports = {
   logs_system: 'tizim',
   logs_empty: "Hali yozuvlar yo'q",
 
+  broadcast_title: 'Xabar yuborish',
+  broadcast_intro:
+    "Xabar bot nomidan tanlangan barcha foydalanuvchilarga ularning interfeys tilida yuboriladi. Amalni bekor qilib bo'lmaydi — yuborilgan xabarni qaytarib olib bo'lmaydi.",
+  broadcast_section_text: 'Xabar matni',
+  broadcast_field_text_ru: "Ruscha matn",
+  broadcast_field_text_uz: "O'zbekcha matn",
+  broadcast_field_text_hint: "Oddiy matn sifatida yuboriladi, formatlash (HTML teglar) qo'llab-quvvatlanmaydi.",
+  broadcast_section_recipients: 'Qabul qiluvchilar',
+  broadcast_field_exclude_blocked: 'Bloklangan foydalanuvchilarga yubormaslik',
+  broadcast_recipients_hint: (count) => `Xabar oladi: ${count} foydalanuvchi`,
+  broadcast_confirm: (count) => `${count} foydalanuvchiga xabar yuborilsinmi? Bu amalni bekor qilib bo'lmaydi.`,
+  broadcast_submit: 'Xabarni yuborish',
+
   settings_title: 'Bot sozlamalari',
   settings_intro:
     "O'zgarishlar serverni qayta ishga tushirmasdan darhol qo'llaniladi. Maxfiy kalitlar (tokenlar, provayder parollari) bu yerda tahrirlanmaydi — xavfsizlik uchun ular .env faylida qoladi.",
@@ -162,6 +179,7 @@ module.exports = {
   flash_promo_activated: 'Promokod yoqildi',
   flash_promo_deactivated: "Promokod o'chirildi",
   flash_settings_saved: 'Sozlamalar saqlandi',
+  flash_broadcast_started: "Xabar yuborish boshlandi — natija botda adminlarga xabar sifatida keladi",
 
   error_user_not_found: 'Foydalanuvchi topilmadi',
   error_payment_not_found: "To'lov topilmadi",
@@ -175,4 +193,5 @@ module.exports = {
   error_negative_amount: "Summa manfiy bo'lishi mumkin emas",
   error_expires_in_past: "Tugash sanasi o'tmishda bo'lishi mumkin emas",
   error_code_taken: 'Bu promokod allaqachon mavjud',
+  error_broadcast_text_required: "Ikkala tildagi xabar matnini to'ldiring",
 };

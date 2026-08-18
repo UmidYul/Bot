@@ -1,0 +1,81 @@
+<h1><%= t('broadcast_title') %></h1>
+
+<% if (flash) { %>
+  <div class="flash flash-success"><%= flash %></div>
+<% } %>
+<% if (error) { %>
+  <div class="flash flash-error"><%= error %></div>
+<% } %>
+
+<p class="muted" style="margin:-8px auto 20px;max-width:760px"><%= t('broadcast_intro') %></p>
+
+<div class="card" style="max-width:760px;margin:0 auto">
+  <form method="POST" action="/admin/broadcast" id="broadcastForm">
+    <div class="card-section">
+      <div class="card-section-title"><%= t('broadcast_section_text') %></div>
+
+      <div class="field">
+        <label for="text_ru"><%= t('broadcast_field_text_ru') %></label>
+        <textarea id="text_ru" name="text_ru" rows="5" required><%= values.text_ru || '' %></textarea>
+      </div>
+
+      <div class="field">
+        <label for="text_uz"><%= t('broadcast_field_text_uz') %></label>
+        <textarea id="text_uz" name="text_uz" rows="5" required><%= values.text_uz || '' %></textarea>
+        <div class="field-hint"><%= t('broadcast_field_text_hint') %></div>
+      </div>
+    </div>
+
+    <div class="card-section">
+      <div class="card-section-title"><%= t('broadcast_section_recipients') %></div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="exclude_blocked" name="exclude_blocked" value="on" <%= values.exclude_blocked === false ? '' : 'checked' %> />
+        <label for="exclude_blocked"><%= t('broadcast_field_exclude_blocked') %></label>
+      </div>
+
+      <div class="field-hint" id="recipientsHint" data-total-active="<%= totalActive %>" data-total-all="<%= totalAll %>">
+        <%= t('broadcast_recipients_hint', totalActive) %>
+      </div>
+    </div>
+
+    <div style="margin-top:24px">
+      <button type="submit" class="btn btn-primary"><%= t('broadcast_submit') %></button>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function () {
+    var form = document.getElementById('broadcastForm');
+    var checkbox = document.getElementById('exclude_blocked');
+    var hint = document.getElementById('recipientsHint');
+    var totalActive = hint.getAttribute('data-total-active');
+    var totalAll = hint.getAttribute('data-total-all');
+    var hintTemplate = <%- JSON.stringify(t('broadcast_recipients_hint', '__COUNT__')) %>;
+
+    function updateHint() {
+      var count = checkbox.checked ? totalActive : totalAll;
+      hint.textContent = hintTemplate.replace('__COUNT__', count);
+    }
+
+    checkbox.addEventListener('change', updateHint);
+    updateHint();
+
+    var confirmTemplate = <%- JSON.stringify(t('broadcast_confirm', '__COUNT__')) %>;
+
+    form.addEventListener('submit', function (e) {
+      if (form.dataset.confirmed) return;
+      e.preventDefault();
+
+      var count = checkbox.checked ? totalActive : totalAll;
+      var message = confirmTemplate.replace('__COUNT__', count);
+
+      window.AdminConfirm.open(message, function () {
+        form.dataset.confirmed = '1';
+        if (form.requestSubmit) form.requestSubmit();
+        else form.submit();
+      });
+    });
+  })();
+</script>

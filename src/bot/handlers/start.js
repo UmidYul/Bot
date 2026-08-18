@@ -2,6 +2,7 @@ const usersRepo = require('../../db/repositories/users');
 const config = require('../../config');
 const { t } = require('../i18n');
 const { html } = require('../reply');
+const { showScreen } = require('../screen');
 const {
   languageKeyboard,
   changeLanguageInlineKeyboard,
@@ -10,8 +11,12 @@ const {
   paymentScreenKeyboard,
 } = require('../keyboards');
 
-async function showPaymentScreen(ctx, user) {
-  await ctx.reply(t(user.language, 'payment_screen', config.channelPrice), html(paymentScreenKeyboard(user.language)));
+/**
+ * prefix — короткая заметка, которую нужно показать вместе с экраном оплаты (например,
+ * "промокод не найден"), не отправляя её отдельным сообщением.
+ */
+async function showPaymentScreen(ctx, user, prefix = '') {
+  await showScreen(ctx, prefix + t(user.language, 'payment_screen', config.channelPrice), paymentScreenKeyboard(user.language));
 }
 
 async function promptForPhone(ctx, user) {
@@ -26,6 +31,12 @@ async function promptForPhone(ctx, user) {
  * из /start, из смены языка и из пунктов меню, чтобы поведение везде было одинаковым.
  */
 async function routeExistingUser(ctx, user) {
+  // Это всегда "свежий" верхнеуровневый заход (после /start, смены языка, кнопки меню
+  // и т.п.), а не продолжение текущего экрана оплаты — забываем прошлый screenMessageId,
+  // иначе showPaymentScreen ниже молча отредактирует какое-то старое сообщение выше по
+  // истории чата вместо того, чтобы показать экран там, где юзер сейчас находится.
+  if (ctx.session) ctx.session.screenMessageId = null;
+
   // Бан — независимый флаг, а не значение status: проверяем его первым, чтобы
   // заблокированный paid-юзер видел сообщение о блокировке, а не "уже оплачено".
   if (user.blocked_at) {

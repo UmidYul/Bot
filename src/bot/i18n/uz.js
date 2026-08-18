@@ -15,7 +15,6 @@ module.exports = {
   pay_button: "💳 To'lash",
   enter_promo_prompt: 'Promokodni bitta xabar sifatida kiriting:',
   cancel_button: '✖️ Bekor qilish',
-  promo_cancelled: 'Promokod kiritish bekor qilindi.',
   promo_invalid: "⚠️ Promokod amal qilmaydi, muddati o'tgan yoki allaqachon ishlatilgan. Boshqasini sinab ko'ring yoki to'lovga o'ting.",
   promo_locked: (minutes) => `🚫 Juda ko'p noto'g'ri urinish. Promokodni ${minutes} daqiqadan so'ng qaytadan kiriting.`,
   promo_applied: (finalAmount) => `✅ Promokod qo'llanildi! Yakuniy summa: <b>${formatAmount(finalAmount)} UZS</b>.`,
@@ -31,7 +30,6 @@ module.exports = {
     `<b>Hisob yaratildi</b>\nSumma: <b>${formatAmount(amount)} UZS</b>\nTo'lov raqami: <code>${merchantTransId}</code>\n\nProvayder ulangach, bu yerda to'lov havolasi paydo bo'ladi.`,
   payment_link: (url) => `To'lash uchun havolaga o'ting:\n${url}`,
   cancel_payment_prompt: "Fikringizdan qaytsangiz — bekor qilib, boshqa usulni tanlashingiz mumkin.",
-  payment_cancelled: "To'lov bekor qilindi. Boshqa usulni tanlashingiz mumkin.",
 
   balance_insufficient: (balance, needed, shortfall) =>
     `⚠️ Hisobingizda mablag' yetarli emas.\n\nBalans: <b>${formatAmount(balance)} UZS</b>\nKerak: <b>${formatAmount(needed)} UZS</b>\nYetishmayapti: <b>${formatAmount(shortfall)} UZS</b>\n\nBalansni to'ldirish uchun Click yoki Payme ilovasini to'g'ridan-to'g'ri oching va kodingizni kiriting (/profile ga qarang).`,

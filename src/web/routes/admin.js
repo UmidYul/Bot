@@ -12,6 +12,8 @@ const adminLogsRepo = require('../../db/repositories/adminLogs');
 const settingsService = require('../../services/settingsService');
 const { revokeAccess, grantAccess } = require('../../services/accessService');
 const { notifyBalanceAdjusted } = require('../../services/balanceService');
+const broadcastService = require('../../services/broadcastService');
+const { notifyAdmins } = require('../../services/adminNotifyService');
 
 const router = express.Router();
 
@@ -435,6 +437,7 @@ const LOG_ACTIONS = [
   'promo_code_toggle',
   'join_request_auto',
   'settings_update',
+  'broadcast_sent',
 ];
 
 router.get(
@@ -462,6 +465,70 @@ router.get(
       page,
       pageCount,
     });
+  })
+);
+
+// --- Рассылка ---
+
+async function renderBroadcastForm(req, res, { error = null, values = {} } = {}) {
+  const [totalActive, totalAll] = await Promise.all([
+    usersRepo.countForBroadcast({ excludeBlocked: true }),
+    usersRepo.countForBroadcast({ excludeBlocked: false }),
+  ]);
+
+  res.render('broadcast', {
+    title: res.locals.t('broadcast_title'),
+    active: 'broadcast',
+    totalActive,
+    totalAll,
+    values,
+    error,
+    flash: req.query.flash ? res.locals.t(`flash_${req.query.flash}`) : null,
+  });
+}
+
+router.get(
+  '/broadcast',
+  asyncHandler(async (req, res) => {
+    await renderBroadcastForm(req, res);
+  })
+);
+
+router.post(
+  '/broadcast',
+  asyncHandler(async (req, res) => {
+    const textRu = (req.body.text_ru || '').trim();
+    const textUz = (req.body.text_uz || '').trim();
+    const excludeBlocked = req.body.exclude_blocked === 'on';
+
+    if (!textRu || !textUz) {
+      return renderBroadcastForm(req, res, {
+        error: res.locals.t('error_broadcast_text_required'),
+        values: { text_ru: textRu, text_uz: textUz, exclude_blocked: excludeBlocked },
+      });
+    }
+
+    const recipientCount = await usersRepo.countForBroadcast({ excludeBlocked });
+    await logAdminAction(req, {
+      action: 'broadcast_sent',
+      meta: { excludeBlocked, recipientCount, textRuLength: textRu.length, textUzLength: textUz.length },
+    });
+
+    // Не ждём завершения рассылки внутри HTTP-запроса — при большой базе и троттлинге
+    // ~20 сообщений/с это может занять минуты, а админка должна остаться отзывчивой.
+    // Итог придёт админам отдельным сообщением в боте (см. ADMIN_NOTIFY_CHAT_IDS).
+    broadcastService
+      .broadcastMessage({ ru: textRu, uz: textUz }, { excludeBlocked })
+      .then((summary) => {
+        console.log(`Рассылка завершена: ${summary.sent}/${summary.total} доставлено, ${summary.failed} ошибок`);
+        return notifyAdmins(
+          `📣 <b>Рассылка завершена</b>\nДоставлено: ${summary.sent}/${summary.total}` +
+            (summary.failed ? `\nОшибок: ${summary.failed}` : '')
+        );
+      })
+      .catch((err) => console.error('broadcast: непредвиденная ошибка рассылки:', err));
+
+    res.redirect(flashUrl('/admin/broadcast', 'broadcast_started'));
   })
 );
 

@@ -10,9 +10,8 @@ const { buildClickPayUrl } = require('../../payments/click.linkBuilder');
 const { buildPaymeCheckoutUrl } = require('../../payments/payme.linkBuilder');
 const telegramPayments = require('../../payments/telegramPayments');
 const { t } = require('../i18n');
-const { html } = require('../reply');
+const { showScreen, closeScreen } = require('../screen');
 const {
-  paymentScreenKeyboard,
   paymentMethodKeyboard,
   promoEntryKeyboard,
   cancelPaymentKeyboard,
@@ -47,8 +46,8 @@ async function guardActionable(ctx, user) {
   return true;
 }
 
-async function showPaymentMethodScreen(ctx, user) {
-  await ctx.reply(t(user.language, 'choose_payment_method'), html(paymentMethodKeyboard(user.language, user.balance)));
+async function showPaymentMethodScreen(ctx, user, prefix = '') {
+  await showScreen(ctx, prefix + t(user.language, 'choose_payment_method'), paymentMethodKeyboard(user.language, user.balance));
 }
 
 async function handleEnterPromo(ctx) {
@@ -57,7 +56,7 @@ async function handleEnterPromo(ctx) {
 
   ctx.session.awaitingPromo = true;
   await ctx.answerCbQuery();
-  await ctx.reply(t(user.language, 'enter_promo_prompt'), html(promoEntryKeyboard(user.language)));
+  await showScreen(ctx, t(user.language, 'enter_promo_prompt'), promoEntryKeyboard(user.language));
 }
 
 async function handlePromoCancel(ctx) {
@@ -66,7 +65,6 @@ async function handlePromoCancel(ctx) {
 
   ctx.session.awaitingPromo = false;
   await ctx.answerCbQuery();
-  await ctx.reply(t(user.language, 'promo_cancelled'));
   await showPaymentScreen(ctx, user);
 }
 
@@ -93,22 +91,32 @@ async function handlePayBack(ctx) {
   await showPaymentScreen(ctx, user);
 }
 
+/** Введённый текст промокода нельзя отредактировать в единый "экран" — просто убираем его из чата. */
+async function deleteUserMessage(ctx) {
+  try {
+    await ctx.deleteMessage(ctx.message.message_id);
+  } catch (err) {
+    // нет прав удалить (сообщение старше 48ч и т.п.) — не критично, просто оставим его
+  }
+}
+
 /** Текстовый ввод промокода — вызывается из общего text-хендлера, если ctx.session.awaitingPromo. */
 async function handlePromoCodeText(ctx) {
   const user = ctx.state.user;
   ctx.session.awaitingPromo = false;
   if (!(await guardActionable(ctx, user))) return;
 
+  const code = (ctx.message.text || '').trim();
+  await deleteUserMessage(ctx);
+
   // Антиспам: после N подряд неверных попыток временно блокируем ввод промокода —
   // защита от перебора кодов.
   if (ctx.session.promoLockedUntil && Date.now() < ctx.session.promoLockedUntil) {
     const minutesLeft = Math.ceil((ctx.session.promoLockedUntil - Date.now()) / 60000);
-    await ctx.reply(t(user.language, 'promo_locked', minutesLeft));
-    await showPaymentScreen(ctx, user);
+    await showPaymentScreen(ctx, user, `${t(user.language, 'promo_locked', minutesLeft)}\n\n`);
     return;
   }
 
-  const code = (ctx.message.text || '').trim();
   const promo = await promoService.validatePromoCode(code);
   if (!promo) {
     ctx.session.promoInvalidAttempts = (ctx.session.promoInvalidAttempts || 0) + 1;
@@ -116,14 +124,12 @@ async function handlePromoCodeText(ctx) {
     if (ctx.session.promoInvalidAttempts >= config.promoAntiSpam.maxAttempts) {
       ctx.session.promoLockedUntil = Date.now() + config.promoAntiSpam.lockoutMinutes * 60 * 1000;
       ctx.session.promoInvalidAttempts = 0;
-      await ctx.reply(t(user.language, 'promo_locked', config.promoAntiSpam.lockoutMinutes));
-      await showPaymentScreen(ctx, user);
+      await showPaymentScreen(ctx, user, `${t(user.language, 'promo_locked', config.promoAntiSpam.lockoutMinutes)}\n\n`);
       await notifyPromoLockout(user, code);
       return;
     }
 
-    await ctx.reply(t(user.language, 'promo_invalid'));
-    await showPaymentScreen(ctx, user);
+    await showPaymentScreen(ctx, user, `${t(user.language, 'promo_invalid')}\n\n`);
     return;
   }
 
@@ -138,8 +144,7 @@ async function handlePromoCodeText(ctx) {
     return;
   }
 
-  await ctx.reply(t(user.language, 'promo_applied', finalAmount), html());
-  await showPaymentMethodScreen(ctx, user);
+  await showPaymentMethodScreen(ctx, user, `${t(user.language, 'promo_applied', finalAmount)}\n\n`);
 }
 
 async function grantFreeAccess(ctx, user, promo) {
@@ -147,8 +152,7 @@ async function grantFreeAccess(ctx, user, promo) {
   // подставили последний доступный free-промокод, только один из них реально его получит.
   const claimed = await promoCodesRepo.incrementUsage(promo.id);
   if (!claimed) {
-    await ctx.reply(t(user.language, 'promo_invalid'));
-    await showPaymentScreen(ctx, user);
+    await showPaymentScreen(ctx, user, `${t(user.language, 'promo_invalid')}\n\n`);
     return;
   }
 
@@ -166,6 +170,7 @@ async function grantFreeAccess(ctx, user, promo) {
   const updatedUser = await usersRepo.updateStatus(user.id, 'paid');
   ctx.state.user = updatedUser;
 
+  await closeScreen(ctx);
   await ctx.reply(t(user.language, 'promo_free_access'));
   await grantAccess(updatedUser);
   await sendReceipt(updatedUser, paid);
@@ -188,7 +193,7 @@ async function handlePayMethod(ctx) {
   // уже после того, как это сообщение было отправлено юзеру.
   if (!config.enabledPaymentProviders.includes(provider)) {
     await ctx.answerCbQuery();
-    await ctx.reply(t(user.language, 'provider_disabled'));
+    await showPaymentMethodScreen(ctx, user, `${t(user.language, 'provider_disabled')}\n\n`);
     return;
   }
 
@@ -207,7 +212,7 @@ async function handlePayBalance(ctx, user) {
   const deducted = await usersRepo.deductBalance(user.id, amount);
   if (!deducted) {
     const shortfall = Math.max(0, amount - Number(user.balance));
-    await ctx.reply(t(user.language, 'balance_insufficient', user.balance, amount, shortfall), html());
+    await showPaymentMethodScreen(ctx, user, `${t(user.language, 'balance_insufficient', user.balance, amount, shortfall)}\n\n`);
     return;
   }
 
@@ -227,6 +232,7 @@ async function handlePayBalance(ctx, user) {
   ctx.state.user = updatedUser;
   resetPaymentSession(ctx);
 
+  await closeScreen(ctx);
   await grantAccess(updatedUser);
   await sendReceipt(updatedUser, paid);
   await notifyNewPayment(updatedUser, paid);
@@ -234,11 +240,10 @@ async function handlePayBalance(ctx, user) {
 
 async function handlePayCancel(ctx) {
   const user = ctx.state.user;
-  if (!user) return;
+  if (!(await guardActionable(ctx, user))) return;
 
   await ctx.answerCbQuery();
   resetPaymentSession(ctx);
-  await ctx.reply(t(user.language, 'payment_cancelled'));
   await showPaymentScreen(ctx, user);
 }
 
@@ -259,9 +264,11 @@ async function initiatePayment(ctx, user, provider) {
 
   // Click подключён как провайдер Telegram Payments (provider_token из BotFather) —
   // юзер оплачивает прямо во встроенном чек-ауте Telegram, без перехода по ссылке.
+  // Экран выбора способа переиспользуем под подсказку с отменой — сам инвойс отдельным
+  // сообщением всё равно не избежать, это отдельный тип сообщения Telegram.
   if (provider === 'click' && telegramPayments.isConfigured()) {
+    await showScreen(ctx, t(user.language, 'cancel_payment_prompt'), cancelPaymentKeyboard(user.language));
     await telegramPayments.sendInvoice(ctx, payment, user);
-    await ctx.reply(t(user.language, 'cancel_payment_prompt'), html(cancelPaymentKeyboard(user.language)));
     return;
   }
 
@@ -271,15 +278,12 @@ async function initiatePayment(ctx, user, provider) {
   if (!hasRealCreds) {
     // Реальных merchant-данных провайдера ещё нет (см. .env.example) — показываем номер
     // платежа текстом, чтобы можно было протестировать всё до касс Click/Payme.
-    await ctx.reply(
-      t(user.language, 'payment_created', amount, payment.merchant_trans_id),
-      html(cancelPaymentKeyboard(user.language))
-    );
+    await showScreen(ctx, t(user.language, 'payment_created', amount, payment.merchant_trans_id), cancelPaymentKeyboard(user.language));
     return;
   }
 
   const url = provider === 'click' ? buildClickPayUrl(payment, user) : buildPaymeCheckoutUrl(payment, user);
-  await ctx.reply(t(user.language, 'payment_link', url), html(cancelPaymentKeyboard(user.language)));
+  await showScreen(ctx, t(user.language, 'payment_link', url), cancelPaymentKeyboard(user.language));
 }
 
 module.exports = {

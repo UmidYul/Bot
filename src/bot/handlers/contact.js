@@ -19,6 +19,9 @@ async function handleContact(ctx) {
   await usersRepo.updatePhone(user.id, contact.phone_number);
   ctx.state.user.phone = contact.phone_number;
 
+  // Свежий верхнеуровневый заход — см. такой же сброс в routeExistingUser (start.js).
+  if (ctx.session) ctx.session.screenMessageId = null;
+
   await ctx.reply(t(user.language, 'phone_saved'), mainMenuKeyboard(user.language));
   await showPaymentScreen(ctx, ctx.state.user);
 }

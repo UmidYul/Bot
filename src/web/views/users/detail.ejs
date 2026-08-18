@@ -42,7 +42,7 @@
           <button type="submit" class="btn btn-primary"><%= t('btn_unblock') %></button>
         </form>
       <% } else { %>
-        <form method="POST" action="/admin/users/<%= user.id %>/block" onsubmit="return confirm('<%= t('confirm_block') %>');">
+        <form method="POST" action="/admin/users/<%= user.id %>/block" data-confirm="<%= t('confirm_block') %>">
           <button type="submit" class="btn btn-danger"><%= t('btn_block') %></button>
         </form>
       <% } %>
@@ -52,7 +52,7 @@
           <button type="submit" class="btn btn-primary"><%= t('btn_restore') %></button>
         </form>
       <% } else { %>
-        <form method="POST" action="/admin/users/<%= user.id %>/delete" onsubmit="return confirm('<%= t('confirm_delete') %>');">
+        <form method="POST" action="/admin/users/<%= user.id %>/delete" data-confirm="<%= t('confirm_delete') %>">
           <button type="submit" class="btn btn-danger"><%= t('btn_delete') %></button>
         </form>
       <% } %>

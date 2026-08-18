@@ -179,6 +179,26 @@ async function listUsers(filters = {}, pagination = {}) {
   return { rows, total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) };
 }
 
+/**
+ * Получатели рассылки — не удалённые юзеры (у них всегда есть telegram_id, обязателен при
+ * регистрации). excludeBlocked по умолчанию true: юзеров, заблокированных админом, обычно
+ * не имеет смысла беспокоить массовыми объявлениями о канале, к которому у них нет доступа.
+ */
+function broadcastRecipientsQuery({ excludeBlocked = true } = {}) {
+  const query = db('users').whereNull('deleted_at');
+  if (excludeBlocked) query.whereNull('blocked_at');
+  return query;
+}
+
+function listForBroadcast(filters = {}) {
+  return broadcastRecipientsQuery(filters).select('telegram_id', 'language');
+}
+
+async function countForBroadcast(filters = {}) {
+  const row = await broadcastRecipientsQuery(filters).count({ count: '*' }).first();
+  return parseInt(row.count, 10);
+}
+
 module.exports = {
   createUser,
   findByTelegramId,
@@ -196,4 +216,6 @@ module.exports = {
   deductBalance,
   adjustBalance,
   listUsers,
+  listForBroadcast,
+  countForBroadcast,
 };

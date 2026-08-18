@@ -1,10 +1,14 @@
 module.exports = {
-  app_name: 'TG Sub Bot',
+  app_name: 'Topdim Uz',
   nav_users: 'Пользователи',
   nav_promo_codes: 'Промокоды',
   nav_logs: 'Логи',
+  nav_broadcast: 'Рассылка',
   nav_settings: 'Настройки',
   logout: 'Выйти',
+
+  confirm_ok: 'Подтвердить',
+  confirm_cancel: 'Отмена',
 
   login_title: 'Вход в админку',
   login_field_login: 'Логин',
@@ -119,6 +123,19 @@ module.exports = {
   logs_system: 'система',
   logs_empty: 'Записей ещё нет',
 
+  broadcast_title: 'Рассылка уведомления',
+  broadcast_intro:
+    'Сообщение уйдёт от имени бота всем выбранным пользователям на их языке интерфейса. Действие необратимо — отменить уже отправленную рассылку нельзя.',
+  broadcast_section_text: 'Текст сообщения',
+  broadcast_field_text_ru: 'Текст на русском',
+  broadcast_field_text_uz: 'Текст на узбекском',
+  broadcast_field_text_hint: 'Отправляется как обычный текст, без форматирования (HTML-теги не поддерживаются).',
+  broadcast_section_recipients: 'Получатели',
+  broadcast_field_exclude_blocked: 'Не отправлять заблокированным пользователям',
+  broadcast_recipients_hint: (count) => `Получат уведомление: ${count} пользователей`,
+  broadcast_confirm: (count) => `Отправить уведомление ${count} пользователям? Это действие нельзя отменить.`,
+  broadcast_submit: 'Отправить рассылку',
+
   settings_title: 'Настройки бота',
   settings_intro:
     'Изменения применяются сразу, без перезапуска сервера. Секретные ключи (токены, пароли провайдеров) здесь не редактируются — они остаются в .env из соображений безопасности.',
@@ -162,6 +179,7 @@ module.exports = {
   flash_promo_activated: 'Промокод включён',
   flash_promo_deactivated: 'Промокод отключён',
   flash_settings_saved: 'Настройки сохранены',
+  flash_broadcast_started: 'Рассылка запущена — итог придёт уведомлением в бот администраторам',
 
   error_user_not_found: 'Пользователь не найден',
   error_payment_not_found: 'Платёж не найден',
@@ -175,4 +193,5 @@ module.exports = {
   error_negative_amount: 'Сумма не может быть отрицательной',
   error_expires_in_past: 'Дата истечения не может быть в прошлом',
   error_code_taken: 'Промокод с таким кодом уже существует',
+  error_broadcast_text_required: 'Заполните текст сообщения на обоих языках',
 };
