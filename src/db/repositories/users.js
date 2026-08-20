@@ -9,6 +9,7 @@ async function createUser({ telegramId, username }) {
       username: username || null,
       code,
       status: 'new',
+      language: 'uz',
     })
     .returning('*');
   return user;

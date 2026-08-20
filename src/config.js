@@ -80,6 +80,12 @@ const config = {
     .map((s) => s.trim())
     .filter(Boolean),
 
+  // Username админа (без @) — показывается юзеру в боте по кнопке/команде "Админ".
+  adminUsername: process.env.ADMIN_USERNAME || 'topdim_admin',
+
+  // Ссылка на другой Telegram-канал — показывается юзеру по кнопке "Batafsil" ("Подробнее").
+  otherChannelUrl: process.env.OTHER_CHANNEL_URL || 'https://t.me/topdimuzloyihasi',
+
   promoAntiSpam: {
     maxAttempts: parseInt(process.env.PROMO_MAX_ATTEMPTS || '5', 10),
     lockoutMinutes: parseInt(process.env.PROMO_LOCKOUT_MINUTES || '15', 10),

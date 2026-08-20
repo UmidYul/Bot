@@ -2,7 +2,7 @@ const ru = require('./ru');
 const uz = require('./uz');
 
 const dictionaries = { ru, uz };
-const DEFAULT_LANG = 'ru';
+const DEFAULT_LANG = 'uz';
 
 /**
  * @param {string} lang 'ru' | 'uz'

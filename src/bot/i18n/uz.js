@@ -68,7 +68,8 @@ module.exports = {
   menu_profile: '👤 Profil',
   menu_pay: "💳 To'lov",
   menu_language: '🌐 Til',
-  menu_help: '❓ Yordam',
+  menu_more: 'ℹ️ Batafsil',
+  menu_admin: '🛠 Admin',
   menu_prompt: "Pastdagi menyudan amalni tanlang 👇",
 
   profile_title: '👤 <b>Sizning profilingiz</b>',
@@ -87,17 +88,12 @@ module.exports = {
   status_paid: "✅ to'langan",
   status_blocked: '🚫 bloklangan',
 
-  help_text:
-    "<b>Botdan qanday foydalanish kerak</b>\n\n" +
-    "/start — boshlash / asosiy menyuga qaytish\n" +
-    "/profile — profilingiz va qo'lda to'lov uchun kod\n" +
-    "/help — shu yordam matni\n\n" +
-    "Ekran pastidagi menyu tugmalari komandalar bilan bir xil ishlaydi. Agar biror narsa noto'g'ri ketsa — shunchaki /start yuboring.\n\n" +
-    "💡 Profildagi kodni Click ilovasi orqali balansni to'g'ridan-to'g'ri to'ldirish uchun ishlatishingiz mumkin — uni hisob raqami sifatida kiriting. Balans avtomatik to'ldiriladi, keyin botda «Mening hisobim» to'lov usuli orqali kirish huquqini olishingiz mumkin.",
+  admin_text: (username) => `Barcha savollar bo'yicha administratorga murojaat qiling: @${username}`,
+  more_text: (url) => `Bizning boshqa kanalimiz: ${url}`,
 
   need_phone_first: 'Avval telefon raqamingizni ulashing — pastdagi tugmani bosing.',
 
-  your_code: (code) => `Sizning shaxsiy kodingiz: <code>${code}</code>\nU bank ilovasi orqali qo'lda to'lov qilsangiz kerak bo'ladi.`,
+  your_code: (code) => `Sizning shaxsiy kodingiz: <b><code>${code}</code></b>\nU bank ilovasi orqali qo'lda to'lov qilsangiz kerak bo'ladi.`,
 
   generic_error: "⚠️ Nimadir xato ketdi. Qaytadan urinib ko'ring yoki /start ni qayta yuboring.",
   unrecognized_message: "Tushunmadim 🙂 Pastdagi menyudan foydalaning yoki /start yuboring.",

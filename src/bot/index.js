@@ -6,7 +6,6 @@ const { t, allVariants } = require('./i18n');
 const { html } = require('./reply');
 
 const { handleStart, routeExistingUser } = require('./handlers/start');
-const { handleLanguageChoice } = require('./handlers/language');
 const { handleContact } = require('./handlers/contact');
 const { handleProfile } = require('./handlers/profile');
 const {
@@ -25,7 +24,6 @@ const adminNotifyService = require('../services/adminNotifyService');
 const balanceService = require('../services/balanceService');
 const broadcastService = require('../services/broadcastService');
 const telegramPayments = require('../payments/telegramPayments');
-const { languageKeyboard } = require('./keyboards');
 
 const bot = new Telegraf(config.botToken || 'invalid-token-placeholder');
 accessService.setBot(bot);
@@ -38,15 +36,9 @@ bot.telegram
   .setMyCommands([
     { command: 'start', description: 'Начать / главное меню' },
     { command: 'profile', description: 'Профиль и код для оплаты' },
-    { command: 'language', description: 'Сменить язык / Tilni almashtirish' },
-    { command: 'help', description: 'Помощь' },
+    { command: 'help', description: 'Связаться с администратором' },
   ])
   .catch((err) => console.error('Не удалось установить команды бота:', err.message));
-
-function showLanguageMenu(ctx) {
-  const lang = ctx.state.user ? ctx.state.user.language : 'ru';
-  return ctx.reply(t(lang, 'choose_language'), languageKeyboard());
-}
 
 bot.use(
   session({
@@ -65,14 +57,11 @@ bot.use(ensureUser);
 
 bot.start(handleStart);
 bot.command('profile', handleProfile);
-bot.command('language', showLanguageMenu);
 bot.command('help', (ctx) => {
-  const lang = ctx.state.user ? ctx.state.user.language : 'ru';
-  return ctx.reply(t(lang, 'help_text'), html());
+  const lang = ctx.state.user ? ctx.state.user.language : 'uz';
+  return ctx.reply(t(lang, 'admin_text', config.adminUsername), html());
 });
 
-bot.action(/^lang:(ru|uz)$/, handleLanguageChoice);
-bot.action('lang:menu', showLanguageMenu);
 bot.action('promo:enter', handleEnterPromo);
 bot.action('promo:cancel', handlePromoCancel);
 bot.action('pay:start', handlePayStart);
@@ -86,11 +75,14 @@ bot.on('contact', handleContact);
 // и, что важно, ИМЕЮТ ПРИОРИТЕТ над вводом промокода: если юзер завис в состоянии
 // "ожидаю промокод" и нажал кнопку меню, это не должно быть принято за текст промокода.
 bot.hears(allVariants('menu_profile'), handleProfile);
-bot.hears(allVariants('menu_help'), (ctx) => {
-  const lang = ctx.state.user ? ctx.state.user.language : 'ru';
-  return ctx.reply(t(lang, 'help_text'), html());
+bot.hears(allVariants('menu_more'), (ctx) => {
+  const lang = ctx.state.user ? ctx.state.user.language : 'uz';
+  return ctx.reply(t(lang, 'more_text', config.otherChannelUrl), html());
 });
-bot.hears(allVariants('menu_language'), showLanguageMenu);
+bot.hears(allVariants('menu_admin'), (ctx) => {
+  const lang = ctx.state.user ? ctx.state.user.language : 'uz';
+  return ctx.reply(t(lang, 'admin_text', config.adminUsername), html());
+});
 bot.hears(allVariants('menu_pay'), async (ctx) => {
   const user = ctx.state.user;
   if (!user) return handleStart(ctx);
@@ -110,7 +102,7 @@ bot.on('text', async (ctx, next) => {
 // Финальный "поймал всё" для текста, который не подошёл ни одному хендлеру выше —
 // вместо тишины даём юзеру понятную подсказку вместо ощущения, что бот завис.
 bot.on('text', (ctx) => {
-  const lang = ctx.state.user ? ctx.state.user.language : 'ru';
+  const lang = ctx.state.user ? ctx.state.user.language : 'uz';
   return ctx.reply(t(lang, 'unrecognized_message'));
 });
 
@@ -121,7 +113,7 @@ bot.on('successful_payment', telegramPayments.handleSuccessfulPayment);
 
 bot.catch((err, ctx) => {
   console.error(`Ошибка в обработчике бота (update ${ctx.update.update_id}):`, err);
-  const lang = ctx.state && ctx.state.user ? ctx.state.user.language : 'ru';
+  const lang = ctx.state && ctx.state.user ? ctx.state.user.language : 'uz';
   ctx.reply(t(lang, 'generic_error')).catch(() => {});
   adminNotifyService.notifyBotError(ctx.update.update_id, err).catch(() => {});
 });

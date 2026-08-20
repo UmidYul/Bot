@@ -23,6 +23,7 @@ async function handleContact(ctx) {
   if (ctx.session) ctx.session.screenMessageId = null;
 
   await ctx.reply(t(user.language, 'phone_saved'), mainMenuKeyboard(user.language));
+  await ctx.reply(t(user.language, 'your_code', user.code), html());
   await showPaymentScreen(ctx, ctx.state.user);
 }
 
