@@ -52,6 +52,14 @@ function cancelPaymentKeyboard(lang) {
   return Markup.inlineKeyboard([[Markup.button.callback(t(lang, 'cancel_button'), 'pay:cancel')]]);
 }
 
+/** Ссылка на чекаут провайдера (Click/Payme) — кнопкой, а не голым текстом в сообщении. */
+function paymentLinkKeyboard(lang, url) {
+  return Markup.inlineKeyboard([
+    [Markup.button.url(t(lang, 'pay_open_button'), url)],
+    [Markup.button.callback(t(lang, 'cancel_button'), 'pay:cancel')],
+  ]);
+}
+
 module.exports = {
   sharePhoneKeyboard,
   mainMenuKeyboard,
@@ -59,4 +67,5 @@ module.exports = {
   promoEntryKeyboard,
   paymentMethodKeyboard,
   cancelPaymentKeyboard,
+  paymentLinkKeyboard,
 };

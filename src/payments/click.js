@@ -65,7 +65,11 @@ async function logEvent(paymentId, event, payload) {
  */
 async function resolveOrCreatePayment(merchantTransId) {
   const existing = await paymentsRepo.findByMerchantTransId(merchantTransId);
-  if (existing) return existing;
+  if (existing) {
+    // merchant_trans_id мог по крайне маловероятному совпадению принадлежать платежу,
+    // заведённому под другого провайдера (Payme/промокод) — не отдаём его чужому вебхуку.
+    return existing.provider === 'click' ? existing : null;
+  }
 
   const user = await usersRepo.findByCode(merchantTransId);
   if (!user || user.blocked_at || user.status === 'paid') return null;
@@ -77,6 +81,19 @@ async function resolveOrCreatePayment(merchantTransId) {
     merchantTransId,
     status: 'pending',
   });
+}
+
+/**
+ * Защита от повторной реальной оплаты: юзер мог оставить эту оплату "висеть" (не закрыл
+ * приложение Click), а доступ уже получить другим способом (Payme, промокод, второй
+ * платёж) — или его успели заблокировать, пока платёж был в pending. Проверяем на этапе
+ * Prepare (до того, как Click спишет деньги) — на Complete эту проверку намеренно не
+ * дублируем: к этому моменту Click уже мог реально провести списание, и отказ здесь
+ * означал бы повисшие деньги без доступа и без подтверждения провайдеру.
+ */
+async function assertUserStillPayable(userId) {
+  const user = await usersRepo.findById(userId);
+  return Boolean(user) && !user.blocked_at && user.status !== 'paid';
 }
 
 /**
@@ -106,6 +123,13 @@ async function handlePrepare(payload) {
   if (!amountsMatch(payment.amount, payload.amount)) {
     return { error: ERROR.INVALID_AMOUNT, error_note: 'Incorrect amount' };
   }
+  if (payment.provider_trans_id && payment.provider_trans_id !== String(payload.click_trans_id)) {
+    // На этот payment уже заведена другая транзакция Click.
+    return { error: ERROR.TRANSACTION_CANCELLED, error_note: 'Transaction already exists for this order' };
+  }
+  if (!(await assertUserStillPayable(payment.user_id))) {
+    return { error: ERROR.TRANSACTION_CANCELLED, error_note: 'Order is not payable' };
+  }
 
   await paymentsRepo.setProviderTransId(payment.id, String(payload.click_trans_id));
 
@@ -122,7 +146,7 @@ async function handleComplete(payload) {
   }
 
   const payment = await paymentsRepo.findByMerchantTransId(payload.merchant_trans_id);
-  if (!payment) {
+  if (!payment || payment.provider !== 'click') {
     await logEvent(null, 'complete', payload);
     return { error: ERROR.USER_NOT_FOUND, error_note: 'Order not found' };
   }

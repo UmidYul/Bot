@@ -15,6 +15,7 @@ const {
   paymentMethodKeyboard,
   promoEntryKeyboard,
   cancelPaymentKeyboard,
+  paymentLinkKeyboard,
 } = require('../keyboards');
 const { showPaymentScreen, routeExistingUser } = require('./start');
 
@@ -242,7 +243,7 @@ async function initiatePayment(ctx, user, provider) {
   }
 
   const url = provider === 'click' ? buildClickPayUrl(payment, user) : buildPaymeCheckoutUrl(payment, user);
-  await showScreen(ctx, t(user.language, 'payment_link', url), cancelPaymentKeyboard(user.language));
+  await showScreen(ctx, t(user.language, 'payment_link_prompt'), paymentLinkKeyboard(user.language, url));
 }
 
 module.exports = {

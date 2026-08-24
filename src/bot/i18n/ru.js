@@ -30,7 +30,8 @@ module.exports = {
   provider_disabled: 'Этот способ оплаты сейчас недоступен. Пожалуйста, выберите другой на экране оплаты.',
   payment_created: (amount, merchantTransId) =>
     `<b>Счёт создан</b>\nСумма: <b>${formatAmount(amount)} UZS</b>\nНомер платежа: <code>${merchantTransId}</code>\n\nСсылка на оплату появится здесь после подключения провайдера.`,
-  payment_link: (url) => `Для оплаты перейдите по ссылке:\n${url}`,
+  payment_link_prompt: 'Нажмите кнопку ниже, чтобы перейти к оплате:',
+  pay_open_button: '💳 Перейти к оплате',
   cancel_payment_prompt: 'Если передумали — можно отменить и выбрать другой способ.',
 
   invoice_title: 'Доступ к каналу',

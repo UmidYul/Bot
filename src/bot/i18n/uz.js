@@ -28,7 +28,8 @@ module.exports = {
   provider_disabled: "Bu to'lov usuli hozircha mavjud emas. Iltimos, to'lov ekranida boshqa usulni tanlang.",
   payment_created: (amount, merchantTransId) =>
     `<b>Hisob yaratildi</b>\nSumma: <b>${formatAmount(amount)} UZS</b>\nTo'lov raqami: <code>${merchantTransId}</code>\n\nProvayder ulangach, bu yerda to'lov havolasi paydo bo'ladi.`,
-  payment_link: (url) => `To'lash uchun havolaga o'ting:\n${url}`,
+  payment_link_prompt: "To'lash uchun pastdagi tugmani bosing:",
+  pay_open_button: "💳 To'lovga o'tish",
   cancel_payment_prompt: "Fikringizdan qaytsangiz — bekor qilib, boshqa usulni tanlashingiz mumkin.",
 
   invoice_title: 'Kanalga kirish',

@@ -59,12 +59,32 @@ async function resolveAccount(account) {
   if (!merchantTransId) return null;
 
   const payment = await paymentsRepo.findByMerchantTransId(merchantTransId);
-  if (payment) return { merchantTransId, payment, user: null };
+  if (payment) {
+    // merchant_trans_id мог по крайне маловероятному совпадению принадлежать платежу,
+    // заведённому под другого провайдера (Click/промокод) — не отдаём его чужому вебхуку.
+    if (payment.provider !== 'payme') return null;
+    return { merchantTransId, payment, user: null };
+  }
 
   const user = await usersRepo.findByCode(merchantTransId);
   if (!user || user.blocked_at || user.status === 'paid') return null;
 
   return { merchantTransId, payment: null, user };
+}
+
+/**
+ * Защита от повторной реальной оплаты: юзер мог оставить эту оплату "висеть" (не закрыл
+ * страницу Payme), а доступ уже получить другим способом (Click, промокод, второй платёж) —
+ * или его успели заблокировать, пока платёж был в pending. Проверяем ДО списания денег
+ * (CheckPerformTransaction/CreateTransaction), чтобы не доводить до реального списания —
+ * в PerformTransaction эту проверку намеренно не дублируем: к этому моменту Payme уже мог
+ * списать/захолдировать средства, и отказ здесь означал бы повисшие деньги без доступа.
+ */
+async function assertUserStillPayable(userId) {
+  const user = await usersRepo.findById(userId);
+  if (!user || user.blocked_at || user.status === 'paid') {
+    throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
+  }
 }
 
 function amountsMatch(paymentAmountUzs, paymeAmountTiyin) {
@@ -104,6 +124,7 @@ async function checkPerformTransaction(params) {
     if (!amountsMatch(resolved.payment.amount, params.amount)) {
       throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
     }
+    await assertUserStillPayable(resolved.payment.user_id);
   } else if (!amountsMatch(config.channelPrice, params.amount)) {
     // Платёж ещё не существует — юзер платит напрямую по коду, минуя бота. Оплата
     // разовая и по фиксированной цене, а не произвольная сумма.
@@ -147,6 +168,7 @@ async function createTransaction(params) {
       // На этот payment уже заведена другая транзакция Payme.
       throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Transaction already exists for this order');
     }
+    await assertUserStillPayable(payment.user_id);
 
     payment = await paymentsRepo.setProviderTransId(payment.id, params.id);
     payment = await paymentsRepo.setPaymeCreateTime(payment.id, params.time);
