@@ -262,12 +262,37 @@ async function checkTransaction(params) {
   };
 }
 
+/** Payme дёргает GetStatement за период [from; to] (мс) для сверки/выписки — возвращает
+ * все транзакции, у которых к этому моменту уже был вызван CreateTransaction. */
+async function getStatement(params) {
+  const from = Number(params.from);
+  const to = Number(params.to);
+
+  const payments = await paymentsRepo.findPaymeStatementRange(from, to);
+
+  return {
+    transactions: payments.map((payment) => ({
+      id: payment.provider_trans_id,
+      time: Number(payment.payme_create_time),
+      amount: Math.round(Number(payment.amount) * 100),
+      account: { merchant_trans_id: payment.merchant_trans_id },
+      create_time: Number(payment.payme_create_time),
+      perform_time: toMs(payment.paid_at),
+      cancel_time: toMs(payment.canceled_at),
+      transaction: String(payment.id),
+      state: toRpcState(payment),
+      reason: payment.cancel_reason || null,
+    })),
+  };
+}
+
 const METHODS = {
   CheckPerformTransaction: checkPerformTransaction,
   CreateTransaction: createTransaction,
   PerformTransaction: performTransaction,
   CancelTransaction: cancelTransaction,
   CheckTransaction: checkTransaction,
+  GetStatement: getStatement,
 };
 
 /**
@@ -311,4 +336,5 @@ module.exports = {
   performTransaction,
   cancelTransaction,
   checkTransaction,
+  getStatement,
 };

@@ -96,6 +96,16 @@ async function setRawPayload(id, payload) {
   return payment;
 }
 
+/** Payme GetStatement: платежи, по которым Payme реально заводил транзакцию (payme_create_time
+ * проставляется в createTransaction), созданные в диапазоне [from; to] мс. */
+function findPaymeStatementRange(from, to) {
+  return db('payments')
+    .where({ provider: 'payme' })
+    .whereNotNull('payme_create_time')
+    .whereBetween('payme_create_time', [from, to])
+    .orderBy('payme_create_time', 'asc');
+}
+
 function listByUserId(userId) {
   return db('payments as p')
     .leftJoin('promo_codes as pc', 'pc.id', 'p.promo_code_id')
@@ -130,6 +140,7 @@ module.exports = {
   setPaymeCreateTime,
   setRawPayload,
   listByUserId,
+  findPaymeStatementRange,
   findLastPaidByUserId,
   addEvent,
 };
