@@ -11,7 +11,6 @@ const promoCodesRepo = require('../../db/repositories/promoCodes');
 const adminLogsRepo = require('../../db/repositories/adminLogs');
 const settingsService = require('../../services/settingsService');
 const { revokeAccess, grantAccess } = require('../../services/accessService');
-const { notifyBalanceAdjusted } = require('../../services/balanceService');
 const broadcastService = require('../../services/broadcastService');
 const { notifyAdmins } = require('../../services/adminNotifyService');
 
@@ -195,36 +194,6 @@ router.post(
     await logAdminAction(req, { action: 'user_restore', targetUserId: user.id });
 
     res.redirect(flashUrl(`/admin/users/${user.id}`, 'user_restored'));
-  })
-);
-
-router.post(
-  '/users/:id/balance/adjust',
-  asyncHandler(async (req, res) => {
-    const user = await usersRepo.findById(req.params.id);
-    if (!user) return res.status(404).send(res.locals.t('error_user_not_found'));
-
-    const amount = parseFloat(req.body.amount);
-    const reason = (req.body.reason || '').trim();
-
-    if (!Number.isFinite(amount) || amount === 0) {
-      return renderUserDetail(req, res, user, { error: res.locals.t('error_invalid_amount'), flash: null });
-    }
-
-    const balanceBefore = Number(user.balance);
-    const updated = await usersRepo.adjustBalance(user.id, amount);
-    if (!updated) {
-      return renderUserDetail(req, res, user, { error: res.locals.t('error_insufficient_balance'), flash: null });
-    }
-
-    await logAdminAction(req, {
-      action: 'balance_adjust',
-      targetUserId: user.id,
-      meta: { amount, reason, balanceBefore, balanceAfter: Number(updated.balance) },
-    });
-    await notifyBalanceAdjusted(updated, amount, reason);
-
-    res.redirect(flashUrl(`/admin/users/${user.id}`, 'balance_adjusted'));
   })
 );
 
@@ -430,7 +399,6 @@ const LOG_ACTIONS = [
   'user_unblock',
   'user_delete',
   'user_restore',
-  'balance_adjust',
   'user_status_override',
   'promo_code_create',
   'promo_code_update',

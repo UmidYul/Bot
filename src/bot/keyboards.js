@@ -14,14 +14,12 @@ function mainMenuKeyboard(lang) {
   return Markup.keyboard([
     [t(lang, 'menu_profile'), t(lang, 'menu_pay')],
     [t(lang, 'menu_more'), t(lang, 'menu_admin')],
+    [t(lang, 'enter_promo_button')],
   ]).resize();
 }
 
 function paymentScreenKeyboard(lang) {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback(t(lang, 'enter_promo_button'), 'promo:enter')],
-    [Markup.button.callback(t(lang, 'pay_button'), 'pay:start')],
-  ]);
+  return Markup.inlineKeyboard([[Markup.button.callback(t(lang, 'pay_button'), 'pay:start')]]);
 }
 
 function promoEntryKeyboard(lang) {
@@ -30,11 +28,9 @@ function promoEntryKeyboard(lang) {
 
 /**
  * Показывает реально включённые внешние провайдеры (см. config.enabledPaymentProviders) —
- * это ПРЯМАЯ покупка, доступ выдаётся сразу по завершении. "Мой счёт" — отдельная строка,
- * всегда показывается: списание с баланса, накопленного через "оплату как за коммуналку"
- * (юзер платил напрямую в приложении провайдера по коду, минуя бота).
+ * прямая покупка, доступ выдаётся сразу по завершении.
  */
-function paymentMethodKeyboard(lang, balance) {
+function paymentMethodKeyboard(lang) {
   const buttons = config.enabledPaymentProviders.map((provider) =>
     Markup.button.callback(t(lang, `pay_${provider}`), `pay:method:${provider}`)
   );
@@ -44,7 +40,9 @@ function paymentMethodKeyboard(lang, balance) {
   // поэтому добавляем ряд только если в нём реально что-то есть.
   const rows = [];
   if (buttons.length) rows.push(buttons);
-  rows.push([Markup.button.callback(t(lang, 'pay_balance', balance), 'pay:method:balance')]);
+  // Просто открывает чат с админом (url-кнопка, без callback в бота) — юзер оплачивает и
+  // договаривается вручную, админ сам активирует доступ через веб-панель.
+  rows.push([Markup.button.url(t(lang, 'pay_admin'), `https://t.me/${config.adminUsername}`)]);
   rows.push([Markup.button.callback(t(lang, 'back_button'), 'pay:back')]);
 
   return Markup.inlineKeyboard(rows);

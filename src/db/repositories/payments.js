@@ -1,10 +1,5 @@
 const db = require('../index');
 
-/**
- * purpose='purchase' — прямая покупка доступа (инициирована ботом, доступ выдаётся сразу
- * по завершении). purpose='topup' — пополнение баланса (юзер платит напрямую через
- * приложение провайдера по коду, минуя бота; доступ отдельно списывается через "Мой счёт").
- */
 async function createPayment({
   userId,
   provider,
@@ -13,7 +8,6 @@ async function createPayment({
   promoCodeId = null,
   merchantTransId,
   status = 'pending',
-  purpose = 'purchase',
 }) {
   const [payment] = await db('payments')
     .insert({
@@ -24,7 +18,6 @@ async function createPayment({
       promo_code_id: promoCodeId,
       merchant_trans_id: merchantTransId,
       status,
-      purpose,
     })
     .returning('*');
   return payment;
@@ -111,13 +104,8 @@ function listByUserId(userId) {
     .orderBy('p.created_at', 'desc');
 }
 
-// purpose='purchase' намеренно: пополнения баланса не должны попадать сюда как "последний
-// платёж" — для них своё поле (users.balance), показывается отдельно.
 function findLastPaidByUserId(userId) {
-  return db('payments')
-    .where({ user_id: userId, status: 'paid', purpose: 'purchase' })
-    .orderBy('paid_at', 'desc')
-    .first();
+  return db('payments').where({ user_id: userId, status: 'paid' }).orderBy('paid_at', 'desc').first();
 }
 
 async function addEvent({ paymentId, provider, event, payload }) {

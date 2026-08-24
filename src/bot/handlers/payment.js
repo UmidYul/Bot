@@ -47,15 +47,17 @@ async function guardActionable(ctx, user) {
 }
 
 async function showPaymentMethodScreen(ctx, user, prefix = '') {
-  await showScreen(ctx, prefix + t(user.language, 'choose_payment_method'), paymentMethodKeyboard(user.language, user.balance));
+  await showScreen(ctx, prefix + t(user.language, 'choose_payment_method'), paymentMethodKeyboard(user.language));
 }
 
+/** Теперь вызывается и по кнопке меню (reply-keyboard), а не только по inline-кнопке —
+ * answerCbQuery() только если апдейт реально callback_query. */
 async function handleEnterPromo(ctx) {
   const user = ctx.state.user;
   if (!(await guardActionable(ctx, user))) return;
 
   ctx.session.awaitingPromo = true;
-  await ctx.answerCbQuery();
+  if (ctx.callbackQuery) await ctx.answerCbQuery();
   await showScreen(ctx, t(user.language, 'enter_promo_prompt'), promoEntryKeyboard(user.language));
 }
 
@@ -181,13 +183,7 @@ async function handlePayMethod(ctx) {
   const user = ctx.state.user;
   if (!(await guardActionable(ctx, user))) return;
 
-  const provider = ctx.match[1]; // 'click' | 'payme' | 'balance'
-
-  if (provider === 'balance') {
-    await ctx.answerCbQuery();
-    await handlePayBalance(ctx, user);
-    return;
-  }
+  const provider = ctx.match[1]; // 'click' | 'payme'
 
   // Защита от устаревшей кнопки в истории чата: провайдера могли выключить в настройках
   // уже после того, как это сообщение было отправлено юзеру.
@@ -199,43 +195,6 @@ async function handlePayMethod(ctx) {
 
   await ctx.answerCbQuery();
   await initiatePayment(ctx, user, provider);
-}
-
-/**
- * "Мой счёт" — прямая покупка доступа списанием с баланса, накопленного через оплату
- * напрямую в приложении провайдера по коду (см. resolveOrCreatePayment/resolveAccount
- * в click.js/payme.js). Никакого внешнего провайдера здесь не задействуется.
- */
-async function handlePayBalance(ctx, user) {
-  const amount = ctx.session.finalAmount || config.channelPrice;
-
-  const deducted = await usersRepo.deductBalance(user.id, amount);
-  if (!deducted) {
-    const shortfall = Math.max(0, amount - Number(user.balance));
-    await showPaymentMethodScreen(ctx, user, `${t(user.language, 'balance_insufficient', user.balance, amount, shortfall)}\n\n`);
-    return;
-  }
-
-  const merchantTransId = `${user.code}-${Date.now()}`;
-  const payment = await paymentsRepo.createPayment({
-    userId: user.id,
-    provider: 'balance',
-    amount,
-    promoCodeId: ctx.session.promoCodeId || null,
-    merchantTransId,
-    status: 'paid',
-  });
-  const paid = await paymentsRepo.markPaid(payment.id);
-  if (ctx.session.promoCodeId) await promoCodesRepo.incrementUsage(ctx.session.promoCodeId);
-
-  const updatedUser = await usersRepo.updateStatus(user.id, 'paid');
-  ctx.state.user = updatedUser;
-  resetPaymentSession(ctx);
-
-  await closeScreen(ctx);
-  await grantAccess(updatedUser);
-  await sendReceipt(updatedUser, paid);
-  await notifyNewPayment(updatedUser, paid);
 }
 
 async function handlePayCancel(ctx) {

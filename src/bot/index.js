@@ -5,7 +5,7 @@ const ensureUser = require('./middleware/ensureUser');
 const { t, allVariants } = require('./i18n');
 const { html } = require('./reply');
 
-const { handleStart, routeExistingUser } = require('./handlers/start');
+const { handleStart, openPaymentScreen } = require('./handlers/start');
 const { handleContact } = require('./handlers/contact');
 const { handleProfile } = require('./handlers/profile');
 const {
@@ -21,7 +21,6 @@ const { handleChatJoinRequest } = require('./handlers/joinRequest');
 const accessService = require('../services/accessService');
 const receiptService = require('../services/receiptService');
 const adminNotifyService = require('../services/adminNotifyService');
-const balanceService = require('../services/balanceService');
 const broadcastService = require('../services/broadcastService');
 const telegramPayments = require('../payments/telegramPayments');
 
@@ -29,7 +28,6 @@ const bot = new Telegraf(config.botToken || 'invalid-token-placeholder');
 accessService.setBot(bot);
 receiptService.setBot(bot);
 adminNotifyService.setBot(bot);
-balanceService.setBot(bot);
 broadcastService.setBot(bot);
 
 bot.telegram
@@ -67,7 +65,7 @@ bot.action('promo:cancel', handlePromoCancel);
 bot.action('pay:start', handlePayStart);
 bot.action('pay:back', handlePayBack);
 bot.action('pay:cancel', handlePayCancel);
-bot.action(/^pay:method:(click|payme|balance)$/, handlePayMethod);
+bot.action(/^pay:method:(click|payme)$/, handlePayMethod);
 
 bot.on('contact', handleContact);
 
@@ -87,8 +85,9 @@ bot.hears(allVariants('menu_pay'), async (ctx) => {
   const user = ctx.state.user;
   if (!user) return handleStart(ctx);
   ctx.session.awaitingPromo = false;
-  await routeExistingUser(ctx, user);
+  await openPaymentScreen(ctx, user);
 });
+bot.hears(allVariants('enter_promo_button'), handleEnterPromo);
 
 bot.on('text', async (ctx, next) => {
   const text = (ctx.message.text || '').trim();

@@ -10,7 +10,6 @@ function setBot(bot) {
 const PROVIDER_LABEL_KEY = {
   click: 'provider_click',
   payme: 'provider_payme',
-  balance: 'provider_balance',
   promo: 'provider_promo',
 };
 

@@ -1,6 +1,12 @@
 const db = require('../index');
 const { generateUniqueUserCode } = require('../../services/codeGenerator');
 
+/**
+ * onConflict/ignore — вместо простого insert: два почти одновременных апдейта от одного и
+ * того же нового юзера (двойной тап по /start, повторная доставка апдейта телеграмом) оба
+ * проходят ensureUser с telegram_id, которого ещё нет в БД, и оба вызывают createUser —
+ * без onConflict второй insert падает с 23505 (users_telegram_id_unique) и роняет обработчик.
+ */
 async function createUser({ telegramId, username }) {
   const code = await generateUniqueUserCode(db);
   const [user] = await db('users')
@@ -11,8 +17,10 @@ async function createUser({ telegramId, username }) {
       status: 'new',
       language: 'uz',
     })
+    .onConflict('telegram_id')
+    .ignore()
     .returning('*');
-  return user;
+  return user || findByTelegramId(telegramId);
 }
 
 function findByTelegramId(telegramId) {
@@ -87,40 +95,6 @@ async function restoreUser(id) {
 }
 
 /**
- * Ручная корректировка баланса из админки (в любую сторону). Отрицательная сумма идёт
- * через тот же атомарный путь, что и обычное списание — админ не может увести баланс
- * в минус так же, как и юзер. Возвращает undefined, если списание отрицательной суммы
- * не прошло (не хватает средств).
- */
-function adjustBalance(id, amount) {
-  if (amount >= 0) return incrementBalance(id, amount);
-  return deductBalance(id, -amount);
-}
-
-/** Пополнение баланса — просто прибавляет, гонки тут не критичны (только зачисление). */
-async function incrementBalance(id, amount) {
-  const [user] = await db('users')
-    .where({ id })
-    .update({ balance: db.raw('balance + ?', [amount]), updated_at: db.fn.now() })
-    .returning('*');
-  return user;
-}
-
-/**
- * Атомарное списание с баланса — условие balance >= amount проверяется в том же UPDATE,
- * что и вычитание, поэтому под конкурентной нагрузкой (например, двойной тап на "Мой счёт")
- * баланс не может уйти в минус. Возвращает undefined, если средств не хватило.
- */
-async function deductBalance(id, amount) {
-  const [user] = await db('users')
-    .where({ id })
-    .andWhere('balance', '>=', amount)
-    .update({ balance: db.raw('balance - ?', [amount]), updated_at: db.fn.now() })
-    .returning('*');
-  return user;
-}
-
-/**
  * @param {{q?: string, status?: string, deleted?: boolean}} filters status: 'new'|'pending'|
  *   'paid' фильтрует по жизненному циклу оплаты как есть; 'blocked' — отдельно, по
  *   blocked_at (бан теперь не значение status, а независимый флаг). deleted=true — показать
@@ -167,7 +141,7 @@ async function listUsers(filters = {}, pagination = {}) {
     .joinRaw(
       `LEFT JOIN LATERAL (
         SELECT * FROM payments
-        WHERE payments.user_id = users.id AND payments.purpose = 'purchase'
+        WHERE payments.user_id = users.id
         ORDER BY payments.created_at DESC
         LIMIT 1
       ) lp ON true`
@@ -213,9 +187,6 @@ module.exports = {
   unblockUser,
   deleteUser,
   restoreUser,
-  incrementBalance,
-  deductBalance,
-  adjustBalance,
   listUsers,
   listForBroadcast,
   countForBroadcast,

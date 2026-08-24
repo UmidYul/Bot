@@ -5,7 +5,6 @@ const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
 const { notifyNewPayment } = require('../services/adminNotifyService');
-const { creditBalance } = require('../services/balanceService');
 
 // Стандартные коды ошибок Payme Merchant API.
 const ERROR = {
@@ -51,7 +50,8 @@ function checkAuth(authorizationHeader) {
  * Если платежа с таким merchant_trans_id ещё нет в БД — это может быть "оплата как за
  * коммуналку": юзер открыл приложение Payme напрямую, минуя бота, и ввёл свой код
  * лицевого счёта. В этом случае merchant_trans_id прилетает как есть (сам код), и мы
- * пробуем найти по нему юзера, чтобы завести платёж на лету.
+ * пробуем найти по нему юзера, чтобы завести платёж на лету — доступ выдаётся сразу по
+ * фиксированной цене (config.channelPrice), это не пополнение произвольной суммой.
  * @returns {Promise<{merchantTransId: string, payment: object|null, user: object|null}|null>}
  */
 async function resolveAccount(account) {
@@ -104,9 +104,9 @@ async function checkPerformTransaction(params) {
     if (!amountsMatch(resolved.payment.amount, params.amount)) {
       throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
     }
-  } else if (!(Number(params.amount) > 0)) {
-    // Платёж ещё не существует — это пополнение баланса по коду напрямую, минуя бота.
-    // Фиксированной цены для проверки нет, сумма может быть любой положительной.
+  } else if (!amountsMatch(config.channelPrice, params.amount)) {
+    // Платёж ещё не существует — юзер платит напрямую по коду, минуя бота. Оплата
+    // разовая и по фиксированной цене, а не произвольная сумма.
     throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
   }
 
@@ -121,17 +121,18 @@ async function createTransaction(params) {
     if (!resolved) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
 
     // Платёж по коду ещё не заведён в БД — юзер платит вручную через приложение Payme,
-    // минуя бота. Заводим пополнение баланса на лету суммой, которую Payme прислал
-    // (params.amount в тийинах — переводим в сумы).
+    // минуя бота. Заводим его на лету по фиксированной цене (config.channelPrice), а не
+    // суммой, которую прислал Payme — иначе доступ можно было бы получить, оплатив
+    // произвольную сумму (сверка ниже через amountsMatch всё равно её отклонит, но платёж
+    // не должен даже создаваться с "неправильной" ценой).
     payment =
       resolved.payment ||
       (await paymentsRepo.createPayment({
         userId: resolved.user.id,
         provider: 'payme',
-        amount: Number(params.amount) / 100,
+        amount: config.channelPrice,
         merchantTransId: resolved.merchantTransId,
         status: 'pending',
-        purpose: 'topup',
       }));
 
     await logEvent(payment.id, 'CreateTransaction', params);
@@ -186,18 +187,11 @@ async function performTransaction(params) {
   const paidAt = new Date();
   const updated = await paymentsRepo.markPaid(payment.id, { paidAt });
 
-  if (payment.purpose === 'topup') {
-    // Оплата напрямую в приложении Payme по коду, минуя бота — зачисляем на баланс,
-    // доступ НЕ выдаём (это отдельное явное действие через "Мой счёт" в боте).
-    const user = await usersRepo.findById(payment.user_id);
-    await creditBalance(user, updated.amount, 'payme');
-  } else {
-    if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
-    const user = await usersRepo.updateStatus(payment.user_id, 'paid');
-    await grantAccess(user);
-    await sendReceipt(user, updated);
-    await notifyNewPayment(user, updated);
-  }
+  if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
+  const user = await usersRepo.updateStatus(payment.user_id, 'paid');
+  await grantAccess(user);
+  await sendReceipt(user, updated);
+  await notifyNewPayment(user, updated);
 
   return {
     transaction: String(updated.id),

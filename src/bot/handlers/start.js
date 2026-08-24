@@ -19,13 +19,46 @@ async function promptForPhone(ctx, user) {
 }
 
 /**
+ * Общие проверки состояния юзера перед тем, как показать меню/экран оплаты — общие для
+ * routeExistingUser и openPaymentScreen. Возвращает true, если можно продолжать (юзер не
+ * забанен, ещё не оплатил, телефон есть); иначе сама отправляет нужное сообщение и
+ * возвращает false.
+ */
+async function guardUserState(ctx, user) {
+  // Бан — независимый флаг, а не значение status: проверяем его первым, чтобы
+  // заблокированный paid-юзер видел сообщение о блокировке, а не "уже оплачено".
+  if (user.blocked_at) {
+    await ctx.reply(t(user.language, 'blocked'), html());
+    return false;
+  }
+
+  if (user.status === 'paid') {
+    const extra = config.channelInviteLink
+      ? html({ reply_markup: { inline_keyboard: [[{ text: t(user.language, 'open_channel_button'), url: config.channelInviteLink }]] } })
+      : html();
+    await ctx.reply(t(user.language, 'already_paid'), extra);
+    return false;
+  }
+
+  if (!user.phone) {
+    await promptForPhone(ctx, user);
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Общая логика "что показать" для уже существующего в БД юзера — переиспользуется
  * из /start, из смены языка и из пунктов меню, чтобы поведение везде было одинаковым.
+ * Экран оплаты здесь НЕ показывается — он открывается только явно, по кнопке "To'lov"
+ * в меню (см. openPaymentScreen и её использование в index.js), а не сразу после
+ * регистрации или на каждый /start.
  */
 async function routeExistingUser(ctx, user) {
   // Это всегда "свежий" верхнеуровневый заход (после /start, смены языка, кнопки меню
   // и т.п.), а не продолжение текущего экрана оплаты — забываем прошлый screenMessageId,
-  // иначе showPaymentScreen ниже молча отредактирует какое-то старое сообщение выше по
+  // иначе openPaymentScreen ниже молча отредактирует какое-то старое сообщение выше по
   // истории чата вместо того, чтобы показать экран там, где юзер сейчас находится.
   if (ctx.session) ctx.session.screenMessageId = null;
 
@@ -38,26 +71,13 @@ async function routeExistingUser(ctx, user) {
     await ctx.reply(t(user.language, 'menu_prompt'), mainMenuKeyboard(user.language));
   }
 
-  // Бан — независимый флаг, а не значение status: проверяем его первым, чтобы
-  // заблокированный paid-юзер видел сообщение о блокировке, а не "уже оплачено".
-  if (user.blocked_at) {
-    await ctx.reply(t(user.language, 'blocked'), html());
-    return;
-  }
+  await guardUserState(ctx, user);
+}
 
-  if (user.status === 'paid') {
-    const extra = config.channelInviteLink
-      ? html({ reply_markup: { inline_keyboard: [[{ text: t(user.language, 'open_channel_button'), url: config.channelInviteLink }]] } })
-      : html();
-    await ctx.reply(t(user.language, 'already_paid'), extra);
-    return;
-  }
-
-  if (!user.phone) {
-    await promptForPhone(ctx, user);
-    return;
-  }
-
+/** Открывает экран оплаты — только по явному действию юзера (кнопка "To'lov" в меню). */
+async function openPaymentScreen(ctx, user) {
+  if (ctx.session) ctx.session.screenMessageId = null;
+  if (!(await guardUserState(ctx, user))) return;
   await showPaymentScreen(ctx, user);
 }
 
@@ -81,4 +101,4 @@ async function handleStart(ctx) {
   await routeExistingUser(ctx, user);
 }
 
-module.exports = { handleStart, showPaymentScreen, promptForPhone, routeExistingUser };
+module.exports = { handleStart, showPaymentScreen, promptForPhone, routeExistingUser, openPaymentScreen };

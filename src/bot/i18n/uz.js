@@ -10,7 +10,7 @@ module.exports = {
   phone_saved: '✅ Raqam saqlandi, rahmat!',
 
   payment_screen: (price) =>
-    `<b>Yopiq kanalga kirish</b>\n\nNarxi: <b>${formatAmount(price)} UZS</b>\n\nAgar promokodingiz bo'lsa — kiriting. Yoki to'g'ridan-to'g'ri to'lovga o'ting.`,
+    `<b>Yopiq kanalga kirish</b>\n\nNarxi: <b>${formatAmount(price)} UZS</b>\n\nPromokodingiz bo'lsa — menyudagi "Promokod kiritish" tugmasidan foydalaning. Yoki to'g'ridan-to'g'ri to'lovga o'ting.`,
   enter_promo_button: '🎟 Promokod kiritish',
   pay_button: "💳 To'lash",
   enter_promo_prompt: 'Promokodni bitta xabar sifatida kiriting:',
@@ -24,19 +24,12 @@ module.exports = {
   choose_payment_method: "To'lov usulini tanlang:",
   pay_click: '💳 Click',
   pay_payme: '💳 Payme',
-  pay_balance: (balance) => `💰 Mening hisobim (${formatAmount(balance)} UZS)`,
+  pay_admin: "👤 Administrator orqali to'lash",
   provider_disabled: "Bu to'lov usuli hozircha mavjud emas. Iltimos, to'lov ekranida boshqa usulni tanlang.",
   payment_created: (amount, merchantTransId) =>
     `<b>Hisob yaratildi</b>\nSumma: <b>${formatAmount(amount)} UZS</b>\nTo'lov raqami: <code>${merchantTransId}</code>\n\nProvayder ulangach, bu yerda to'lov havolasi paydo bo'ladi.`,
   payment_link: (url) => `To'lash uchun havolaga o'ting:\n${url}`,
   cancel_payment_prompt: "Fikringizdan qaytsangiz — bekor qilib, boshqa usulni tanlashingiz mumkin.",
-
-  balance_insufficient: (balance, needed, shortfall) =>
-    `⚠️ Hisobingizda mablag' yetarli emas.\n\nBalans: <b>${formatAmount(balance)} UZS</b>\nKerak: <b>${formatAmount(needed)} UZS</b>\nYetishmayapti: <b>${formatAmount(shortfall)} UZS</b>\n\nBalansni to'ldirish uchun Click yoki Payme ilovasini to'g'ridan-to'g'ri oching va kodingizni kiriting (/profile ga qarang).`,
-  balance_topped_up: (amount, newBalance) =>
-    `💰 <b>Balans ${formatAmount(amount)} UZS ga to'ldirildi</b>\nJoriy balans: <b>${formatAmount(newBalance)} UZS</b>\n\nKanalga kirish huquqini olish uchun menyuga qaytib, «Mening hisobim» to'lov usulini tanlang.`,
-  balance_adjusted_by_admin: (amount, newBalance, reason) =>
-    `${amount > 0 ? '💰' : '⚠️'} <b>Administrator balansingizni ${formatAmount(Math.abs(amount))} UZS ga ${amount > 0 ? "to'ldirdi" : 'kamaytirdi'}</b>${reason ? `\nSabab: ${reason}` : ''}\nJoriy balans: <b>${formatAmount(newBalance)} UZS</b>`,
 
   invoice_title: 'Kanalga kirish',
   invoice_description: "Yopiq kanalga kirish huquqi uchun to'lov",
@@ -53,7 +46,6 @@ module.exports = {
   receipt_promo_label: 'Promokod',
   provider_click: 'Click',
   provider_payme: 'Payme',
-  provider_balance: 'Mening hisobim',
   provider_promo: 'Promokod (bepul)',
 
   already_paid: "✅ Sizda kanalga kirish huquqi allaqachon bor. Agar havola yo'qolgan bo'lsa, u yana shu yerda:",
@@ -79,7 +71,6 @@ module.exports = {
   profile_language_label: '🌐 Til',
   profile_status_label: '📌 Holat',
   profile_registered_label: "📅 Ro'yxatdan o'tgan",
-  profile_balance_label: '💰 Balans',
   profile_last_payment_label: "💳 Oxirgi to'lov",
   profile_no_payments: "hali to'lovlar yo'q",
 
@@ -93,7 +84,7 @@ module.exports = {
 
   need_phone_first: 'Avval telefon raqamingizni ulashing — pastdagi tugmani bosing.',
 
-  your_code: (code) => `Sizning shaxsiy kodingiz: <b><code>${code}</code></b>\nU bank ilovasi orqali qo'lda to'lov qilsangiz kerak bo'ladi.`,
+  your_code: (code) => `Sizning id kodingiz : <b><code>${code}</code></b>`,
 
   generic_error: "⚠️ Nimadir xato ketdi. Qaytadan urinib ko'ring yoki /start ni qayta yuboring.",
   unrecognized_message: "Tushunmadim 🙂 Pastdagi menyudan foydalaning yoki /start yuboring.",

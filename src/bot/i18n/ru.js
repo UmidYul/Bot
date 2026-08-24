@@ -12,7 +12,7 @@ module.exports = {
   phone_saved: '✅ Номер сохранён, спасибо!',
 
   payment_screen: (price) =>
-    `<b>Доступ к закрытому каналу</b>\n\nСтоимость: <b>${formatAmount(price)} UZS</b>\n\nЕсли у вас есть промокод — введите его. Либо сразу переходите к оплате.`,
+    `<b>Доступ к закрытому каналу</b>\n\nСтоимость: <b>${formatAmount(price)} UZS</b>\n\nЕсли у вас есть промокод — используйте кнопку "Ввести промокод" в меню. Либо сразу переходите к оплате.`,
   enter_promo_button: '🎟 Ввести промокод',
   pay_button: '💳 Оплатить',
   enter_promo_prompt: 'Введите промокод одним сообщением:',
@@ -26,19 +26,12 @@ module.exports = {
   choose_payment_method: 'Выберите способ оплаты:',
   pay_click: '💳 Click',
   pay_payme: '💳 Payme',
-  pay_balance: (balance) => `💰 Мой счёт (${formatAmount(balance)} UZS)`,
+  pay_admin: '👤 Оплата через администратора',
   provider_disabled: 'Этот способ оплаты сейчас недоступен. Пожалуйста, выберите другой на экране оплаты.',
   payment_created: (amount, merchantTransId) =>
     `<b>Счёт создан</b>\nСумма: <b>${formatAmount(amount)} UZS</b>\nНомер платежа: <code>${merchantTransId}</code>\n\nСсылка на оплату появится здесь после подключения провайдера.`,
   payment_link: (url) => `Для оплаты перейдите по ссылке:\n${url}`,
   cancel_payment_prompt: 'Если передумали — можно отменить и выбрать другой способ.',
-
-  balance_insufficient: (balance, needed, shortfall) =>
-    `⚠️ На балансе недостаточно средств.\n\nБаланс: <b>${formatAmount(balance)} UZS</b>\nНужно: <b>${formatAmount(needed)} UZS</b>\nНе хватает: <b>${formatAmount(shortfall)} UZS</b>\n\nПополнить баланс можно, открыв приложение Click или Payme напрямую и введя там свой код (смотрите /profile).`,
-  balance_topped_up: (amount, newBalance) =>
-    `💰 <b>Баланс пополнен на ${formatAmount(amount)} UZS</b>\nТекущий баланс: <b>${formatAmount(newBalance)} UZS</b>\n\nЧтобы получить доступ к каналу, вернитесь в меню и выберите способ оплаты «Мой счёт».`,
-  balance_adjusted_by_admin: (amount, newBalance, reason) =>
-    `${amount > 0 ? '💰' : '⚠️'} <b>Администратор ${amount > 0 ? 'пополнил ваш баланс на' : 'списал с вашего баланса'} ${formatAmount(Math.abs(amount))} UZS</b>${reason ? `\nПричина: ${reason}` : ''}\nТекущий баланс: <b>${formatAmount(newBalance)} UZS</b>`,
 
   invoice_title: 'Доступ к каналу',
   invoice_description: 'Оплата доступа к закрытому каналу',
@@ -55,7 +48,6 @@ module.exports = {
   receipt_promo_label: 'Промокод',
   provider_click: 'Click',
   provider_payme: 'Payme',
-  provider_balance: 'Мой счёт',
   provider_promo: 'Промокод (бесплатно)',
 
   already_paid: '✅ У вас уже есть доступ к каналу. Если ссылка потерялась — вот она снова:',
@@ -81,7 +73,6 @@ module.exports = {
   profile_language_label: '🌐 Язык',
   profile_status_label: '📌 Статус',
   profile_registered_label: '📅 Регистрация',
-  profile_balance_label: '💰 Баланс',
   profile_last_payment_label: '💳 Последний платёж',
   profile_no_payments: 'платежей ещё не было',
 

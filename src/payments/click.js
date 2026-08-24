@@ -6,7 +6,6 @@ const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
 const { notifyNewPayment } = require('../services/adminNotifyService');
-const { creditBalance } = require('../services/balanceService');
 
 // Стандартные коды ошибок Click Shop API.
 const ERROR = {
@@ -57,13 +56,14 @@ async function logEvent(paymentId, event, payload) {
 
 /**
  * Находит платёж по merchant_trans_id, а если такого ещё нет — пробует найти юзера по
- * этому же значению как по коду ("лицевой счёт") и завести платёж на лету с purpose='topup'.
- * Это тот самый сценарий "оплата как за коммуналку": юзер открывает приложение Click
- * напрямую, минуя бота, вводит свой код — никакого платежа в БД на этот момент ещё не
- * существует, а сумма может быть любой (это пополнение баланса, не покупка по фиксированной
- * цене — платежи, инициированные ботом, всегда находятся по merchant_trans_id заранее).
+ * этому же значению как по коду и завести платёж на лету. Это сценарий "оплата как за
+ * коммуналку": юзер открывает приложение Click напрямую, минуя бота, вводит свой код —
+ * никакого платежа в БД на этот момент ещё не существует. Сумма всегда фиксированная
+ * (config.channelPrice), а не то, что прислал Click в payload.amount — иначе можно было бы
+ * получить доступ, оплатив через приложение любую произвольную (например, 1) сумму;
+ * реальная сверка суммы происходит чуть ниже через amountsMatch(payment.amount, payload.amount).
  */
-async function resolveOrCreatePayment(merchantTransId, proposedAmount) {
+async function resolveOrCreatePayment(merchantTransId) {
   const existing = await paymentsRepo.findByMerchantTransId(merchantTransId);
   if (existing) return existing;
 
@@ -73,10 +73,9 @@ async function resolveOrCreatePayment(merchantTransId, proposedAmount) {
   return paymentsRepo.createPayment({
     userId: user.id,
     provider: 'click',
-    amount: proposedAmount,
+    amount: config.channelPrice,
     merchantTransId,
     status: 'pending',
-    purpose: 'topup',
   });
 }
 
@@ -89,7 +88,7 @@ async function handlePrepare(payload) {
     return { error: ERROR.SIGN_CHECK_FAILED, error_note: 'SIGN CHECK FAILED' };
   }
 
-  const payment = await resolveOrCreatePayment(payload.merchant_trans_id, payload.amount);
+  const payment = await resolveOrCreatePayment(payload.merchant_trans_id);
   if (!payment) {
     await logEvent(null, 'prepare', payload);
     return { error: ERROR.USER_NOT_FOUND, error_note: 'Order not found' };
@@ -149,19 +148,12 @@ async function handleComplete(payload) {
   }
 
   const paid = await paymentsRepo.markPaid(payment.id);
-  const user = await usersRepo.findById(payment.user_id);
 
-  if (payment.purpose === 'topup') {
-    // Оплата напрямую в приложении Click по коду, минуя бота — зачисляем на баланс,
-    // доступ НЕ выдаём (это отдельное явное действие через "Мой счёт" в боте).
-    await creditBalance(user, paid.amount, 'click');
-  } else {
-    if (payment.promo_code_id) await promoCodesRepo.incrementUsage(payment.promo_code_id);
-    const updatedUser = await usersRepo.updateStatus(payment.user_id, 'paid');
-    await grantAccess(updatedUser);
-    await sendReceipt(updatedUser, paid);
-    await notifyNewPayment(updatedUser, paid);
-  }
+  if (payment.promo_code_id) await promoCodesRepo.incrementUsage(payment.promo_code_id);
+  const updatedUser = await usersRepo.updateStatus(payment.user_id, 'paid');
+  await grantAccess(updatedUser);
+  await sendReceipt(updatedUser, paid);
+  await notifyNewPayment(updatedUser, paid);
 
   return { error: ERROR.SUCCESS, error_note: 'Success', merchant_confirm_id: payment.id };
 }

@@ -29,7 +29,6 @@ async function handleProfile(ctx) {
     `${t(lang, 'profile_language_label')}: ${lang === 'ru' ? '🇷🇺 Русский' : "🇺🇿 O'zbekcha"}`,
     `${t(lang, 'profile_status_label')}: ${t(lang, `status_${user.status}`)}${user.blocked_at ? ` (${t(lang, 'status_blocked')})` : ''}`,
     `${t(lang, 'profile_registered_label')}: ${formatDate(user.created_at)}`,
-    `${t(lang, 'profile_balance_label')}: <b>${Number(user.balance).toLocaleString('ru-RU')} UZS</b>`,
     `${t(lang, 'profile_last_payment_label')}: ${lastPaid ? `${Number(lastPaid.amount).toLocaleString('ru-RU')} UZS (${formatDate(lastPaid.paid_at)})` : t(lang, 'profile_no_payments')}`,
   ];
 
