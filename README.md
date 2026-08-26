@@ -165,7 +165,6 @@ pg_restore --clean --if-exists -d tg_sub_bot backups/tg_sub_bot_20260101_030000.
 - [ ] Настроен HTTPS (обязателен и для Telegram webhook, и для Click/Payme)
 - [ ] `SESSION_SECRET` и `ADMIN_SEED_PASSWORD` заменены на боевые значения (не дефолтные
       dev-заглушки из `.env.example`)
-- [ ] `CLICK_PROVIDER_TOKEN` заменён с `TEST` на боевой (`LIVE`) токен из BotFather
 - [ ] Когда Payme будет готов — `PAYME_ENABLED=true` и реальные `PAYME_MERCHANT_ID`/`SECRET_KEY`
 - [ ] `ADMIN_NOTIFY_CHAT_IDS` заполнен (иначе уведомления о новых оплатах/ошибках не придут)
 - [ ] Настроен крон для `npm run backup` (см. раздел «Бэкапы Postgres»)
@@ -174,19 +173,19 @@ pg_restore --clean --if-exists -d tg_sub_bot backups/tg_sub_bot_20260101_030000.
 
 - **Payme временно отключён** (`PAYME_ENABLED=false`) — кнопка скрыта из бота, но вебхук
   `/payments/payme` остаётся рабочим. Включается одной переменной в `.env`, без правок кода.
-- **Click подключён как Telegram Payments** (`CLICK_PROVIDER_TOKEN` из BotFather →
-  `/mybots` → Payments) — юзер платит во встроенном чек-ауте Telegram
-  (`sendInvoice` → `pre_checkout_query` → `successful_payment`, см.
-  `src/payments/telegramPayments.js`), без перехода по ссылке. Отдельно от этого
-  `src/payments/click.js` реализует сырой Click Shop API — для сценария, когда юзер платит
-  вручную через приложение Click по своему коду (виден в `/profile`).
-- **Единицы измерения суммы различаются**: Click Shop API и наша БД оперируют сумами (UZS),
-  Payme и Telegram Payments — минимальными единицами (тийины/copecks, ×100). Пересчёт учтён
-  в `payme.js` (`amountsMatch`) и `telegramPayments.js` (`toTelegramAmount`).
-  - **Идемпотентность**: все три платёжных пути (Click, Payme, Telegram Payments) написаны
-  так, чтобы повторный вебхук/апдейт не начислял доступ дважды и не удваивал `used_count`
-  промокода — инкремент `used_count` атомарный (условный `UPDATE`), поэтому под конкурентной
-  нагрузкой лимитированный промокод не может быть использован сверх `max_uses`.
+- **Click оплачивается по ссылке** (`src/payments/click.linkBuilder.js` строит
+  `https://my.click.uz/services/pay?...` с уже подставленными `service_id`/`merchant_id`/
+  `amount`/`transaction_param`) — кнопка в боте открывает приложение Click (или веб-чекаут,
+  если приложения нет) с готовым платежом, без встроенного чек-аута Telegram. Подтверждение
+  приходит через сырой Click Shop API (`src/payments/click.js`, Prepare/Complete) — тот же
+  вебхук обслуживает и сценарий, когда юзер платит вручную через приложение Click по своему
+  коду (виден в `/profile`), без прохождения через бота вообще.
+  - **Единицы измерения суммы различаются**: Click Shop API и наша БД оперируют сумами (UZS),
+  Payme — минимальными единицами (тийины, ×100). Пересчёт учтён в `payme.js` (`amountsMatch`).
+  - **Идемпотентность**: оба платёжных пути (Click, Payme) написаны так, чтобы повторный
+  вебхук не начислял доступ дважды и не удваивал `used_count` промокода — инкремент
+  `used_count` атомарный (условный `UPDATE`), поэтому под конкурентной нагрузкой
+  лимитированный промокод не может быть использован сверх `max_uses`.
 - **Реальных merchant-данных Click/Payme (Shop API) ещё нет** —
   `src/payments/*.linkBuilder.js` содержат рабочую схему ссылки с явными `TODO`, которые
   нужно сверить в личных кабинетах перед боевым запуском.

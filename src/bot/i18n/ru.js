@@ -32,14 +32,6 @@ module.exports = {
     `<b>Счёт создан</b>\nСумма: <b>${formatAmount(amount)} UZS</b>\nНомер платежа: <code>${merchantTransId}</code>\n\nСсылка на оплату появится здесь после подключения провайдера.`,
   payment_link_prompt: 'Нажмите кнопку ниже, чтобы перейти к оплате:',
   pay_open_button: '💳 Перейти к оплате',
-  cancel_payment_prompt: 'Если передумали — можно отменить и выбрать другой способ.',
-
-  invoice_title: 'Доступ к каналу',
-  invoice_description: 'Оплата доступа к закрытому каналу',
-  invoice_price_label: 'Доступ к каналу',
-  pre_checkout_order_not_found: 'Заказ не найден или уже обработан. Начните оплату заново через /start.',
-  pre_checkout_amount_mismatch: 'Сумма платежа не совпадает с суммой заказа.',
-  payment_success: '✅ Оплата получена, спасибо!',
 
   receipt_title: '🧾 <b>Квитанция об оплате</b>',
   receipt_amount_label: 'Сумма',

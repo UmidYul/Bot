@@ -32,18 +32,13 @@ const config = {
   sessionSecret: process.env.SESSION_SECRET || 'dev-local-secret-change-in-production',
 
   click: {
-    // Единственный из четырёх реально подключённый провайдер (Telegram Payments +
-    // сырой Shop API) — тумблер тем не менее даём, чтобы можно было временно снять
-    // кнопку из бота (например, на время проблем у провайдера), не трогая код.
+    // Тумблер даём, чтобы можно было временно снять кнопку из бота (например, на время
+    // проблем у провайдера), не трогая код.
     enabled: process.env.CLICK_ENABLED !== 'false',
     serviceId: process.env.CLICK_SERVICE_ID || '',
     merchantId: process.env.CLICK_MERCHANT_ID || '',
     merchantUserId: process.env.CLICK_MERCHANT_USER_ID || '',
     secretKey: process.env.CLICK_SECRET_KEY || '',
-    // provider_token из BotFather (/mybots -> Payments -> Click) для встроенного чек-аута
-    // Telegram (sendInvoice/pre_checkout_query/successful_payment) — НЕ то же самое, что
-    // secretKey выше (тот — для вебхуков Shop API при оплате напрямую через приложение Click).
-    providerToken: process.env.CLICK_PROVIDER_TOKEN || '',
   },
 
   payme: {

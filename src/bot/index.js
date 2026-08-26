@@ -22,7 +22,6 @@ const accessService = require('../services/accessService');
 const receiptService = require('../services/receiptService');
 const adminNotifyService = require('../services/adminNotifyService');
 const broadcastService = require('../services/broadcastService');
-const telegramPayments = require('../payments/telegramPayments');
 
 const bot = new Telegraf(config.botToken || 'invalid-token-placeholder');
 accessService.setBot(bot);
@@ -106,9 +105,6 @@ bot.on('text', (ctx) => {
 });
 
 bot.on('chat_join_request', handleChatJoinRequest);
-
-bot.on('pre_checkout_query', telegramPayments.handlePreCheckoutQuery);
-bot.on('successful_payment', telegramPayments.handleSuccessfulPayment);
 
 bot.catch((err, ctx) => {
   console.error(`Ошибка в обработчике бота (update ${ctx.update.update_id}):`, err);

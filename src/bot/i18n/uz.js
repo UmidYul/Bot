@@ -30,14 +30,6 @@ module.exports = {
     `<b>Hisob yaratildi</b>\nSumma: <b>${formatAmount(amount)} UZS</b>\nTo'lov raqami: <code>${merchantTransId}</code>\n\nProvayder ulangach, bu yerda to'lov havolasi paydo bo'ladi.`,
   payment_link_prompt: "To'lash uchun pastdagi tugmani bosing:",
   pay_open_button: "💳 To'lovga o'tish",
-  cancel_payment_prompt: "Fikringizdan qaytsangiz — bekor qilib, boshqa usulni tanlashingiz mumkin.",
-
-  invoice_title: 'Kanalga kirish',
-  invoice_description: "Yopiq kanalga kirish huquqi uchun to'lov",
-  invoice_price_label: 'Kanalga kirish',
-  pre_checkout_order_not_found: "Buyurtma topilmadi yoki allaqachon qayta ishlangan. /start orqali to'lovni qaytadan boshlang.",
-  pre_checkout_amount_mismatch: "To'lov summasi buyurtma summasiga mos kelmaydi.",
-  payment_success: "✅ To'lov qabul qilindi, rahmat!",
 
   receipt_title: "🧾 <b>To'lov kvitansiyasi</b>",
   receipt_amount_label: 'Summa',

@@ -8,7 +8,6 @@ const { sendReceipt } = require('../../services/receiptService');
 const { notifyNewPayment, notifyPromoLockout } = require('../../services/adminNotifyService');
 const { buildClickPayUrl } = require('../../payments/click.linkBuilder');
 const { buildPaymeCheckoutUrl } = require('../../payments/payme.linkBuilder');
-const telegramPayments = require('../../payments/telegramPayments');
 const { t } = require('../i18n');
 const { showScreen, closeScreen } = require('../screen');
 const {
@@ -221,16 +220,6 @@ async function initiatePayment(ctx, user, provider) {
   });
 
   await usersRepo.updateStatus(user.id, 'pending');
-
-  // Click подключён как провайдер Telegram Payments (provider_token из BotFather) —
-  // юзер оплачивает прямо во встроенном чек-ауте Telegram, без перехода по ссылке.
-  // Экран выбора способа переиспользуем под подсказку с отменой — сам инвойс отдельным
-  // сообщением всё равно не избежать, это отдельный тип сообщения Telegram.
-  if (provider === 'click' && telegramPayments.isConfigured()) {
-    await showScreen(ctx, t(user.language, 'cancel_payment_prompt'), cancelPaymentKeyboard(user.language));
-    await telegramPayments.sendInvoice(ctx, payment, user);
-    return;
-  }
 
   const hasRealCreds =
     provider === 'click' ? Boolean(config.click.serviceId && config.click.merchantId) : Boolean(config.payme.merchantId);
