@@ -231,7 +231,11 @@ async function initiatePayment(ctx, user, provider) {
     return;
   }
 
-  const url = provider === 'click' ? buildClickPayUrl(payment, user) : buildPaymeCheckoutUrl(payment, user);
+  // После оплаты провайдер открывает return_url в браузере юзера — ведём обратно в чат с
+  // ботом, а не на голый сайт: у него нет собственной страницы под "/", только /admin и API.
+  const returnUrl = `https://t.me/${ctx.botInfo.username}`;
+  const url =
+    provider === 'click' ? buildClickPayUrl(payment, user, returnUrl) : buildPaymeCheckoutUrl(payment, user, returnUrl);
   await showScreen(ctx, t(user.language, 'payment_link_prompt'), paymentLinkKeyboard(user.language, url));
 }
 

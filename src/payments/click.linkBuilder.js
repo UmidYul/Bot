@@ -9,15 +9,17 @@ const config = require('../config');
  *
  * @param {{id: number, amount: number, merchant_trans_id: string}} payment
  * @param {{code: string}} user
+ * @param {string} returnUrl куда Click отправит браузер юзера после оплаты — у нас это
+ * t.me/<bot>, чтобы юзер вернулся в чат с ботом, а не на голый сайт без такого роута
  */
-function buildClickPayUrl(payment, user) {
+function buildClickPayUrl(payment, user, returnUrl) {
   const params = new URLSearchParams({
     service_id: config.click.serviceId,
     merchant_id: config.click.merchantId,
     merchant_user_id: config.click.merchantUserId,
     amount: String(payment.amount),
     transaction_param: payment.merchant_trans_id,
-    return_url: config.webBaseUrl,
+    return_url: returnUrl,
   });
 
   return `https://my.click.uz/services/pay?${params.toString()}`;
