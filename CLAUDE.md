@@ -1,3 +1,4 @@
+ANSWER ONLY IN RUSSIAN
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -136,4 +137,3 @@ auto-approves only if the user exists, isn't blocked, and `status === 'paid'`.
   implementation** — enabling them intentionally does not add a bot button
   (`enabledPaymentProviders` ignores them) until they're actually built.
 
-ANSWER ONLY IN RUSSIAN

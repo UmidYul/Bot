@@ -6,6 +6,7 @@ const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
 const { notifyNewPayment } = require('../services/adminNotifyService');
+const { logToFile } = require('../utils/webhookLogger');
 
 // Стандартные коды ошибок Click Shop API.
 const ERROR = {
@@ -25,11 +26,13 @@ const ACTION = { PREPARE: 0, COMPLETE: 1 };
 /**
  * Временное подробное логирование вебхука Click — включено, пока не диагностирована
  * причина "деньги списаны, но payment/user не переходят в paid" в проде. Пишет только
- * нечувствительные поля (никогда не логирует secretKey/sign_string) в stdout, чтобы было
- * видно в `pm2 logs`. Можно убрать/приглушить, когда причина найдена и подтверждена фиксом.
+ * нечувствительные поля (никогда не логирует secretKey/sign_string) — и в stdout, и в файл
+ * logs/webhooks.log (см. src/utils/webhookLogger.js), поскольку на этом хостинге (cPanel
+ * Node.js Selector / Passenger) stdout процесса нигде постоянно не сохраняется. Можно
+ * убрать/приглушить, когда причина найдена и подтверждена фиксом.
  */
 function log(event, data) {
-  console.log(`[click] ${event}`, JSON.stringify(data));
+  logToFile('click', event, data);
 }
 
 /**
