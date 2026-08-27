@@ -8,14 +8,13 @@ function setBot(bot) {
 }
 
 const PROVIDER_LABEL_KEY = {
-  click: 'provider_click',
   payme: 'provider_payme',
   promo: 'provider_promo',
 };
 
 /**
  * Отправляет юзеру чек сразу после успешной оплаты — вызывается из всех путей
- * подтверждения платежа (Click Shop API, Payme, Telegram Payments, бесплатный промокод).
+ * подтверждения платежа (Payme, бесплатный промокод).
  * @param {{telegram_id: number, language: string}} user
  * @param {{amount: number, currency?: string, provider: string, merchant_trans_id: string, paid_at?: Date, promo_code_id?: number}} payment
  */
@@ -33,7 +32,7 @@ async function sendReceipt(user, payment) {
     t(lang, 'receipt_title'),
     '',
     `${t(lang, 'receipt_amount_label')}: <b>${Number(payment.amount).toLocaleString('ru-RU')} ${payment.currency || 'UZS'}</b>`,
-    `${t(lang, 'receipt_provider_label')}: ${t(lang, PROVIDER_LABEL_KEY[payment.provider] || 'provider_click')}`,
+    `${t(lang, 'receipt_provider_label')}: ${t(lang, PROVIDER_LABEL_KEY[payment.provider] || 'provider_payme')}`,
     `${t(lang, 'receipt_id_label')}: <code>${payment.merchant_trans_id}</code>`,
     `${t(lang, 'receipt_date_label')}: ${new Date(payment.paid_at || Date.now()).toLocaleString('ru-RU')}`,
   ];

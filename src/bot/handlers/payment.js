@@ -6,7 +6,6 @@ const promoService = require('../../services/promoService');
 const { grantAccess } = require('../../services/accessService');
 const { sendReceipt } = require('../../services/receiptService');
 const { notifyNewPayment, notifyPromoLockout } = require('../../services/adminNotifyService');
-const { buildClickPayUrl } = require('../../payments/click.linkBuilder');
 const { buildPaymeCheckoutUrl } = require('../../payments/payme.linkBuilder');
 const { t } = require('../i18n');
 const { showScreen, closeScreen } = require('../screen');
@@ -183,7 +182,7 @@ async function handlePayMethod(ctx) {
   const user = ctx.state.user;
   if (!(await guardActionable(ctx, user))) return;
 
-  const provider = ctx.match[1]; // 'click' | 'payme'
+  const provider = ctx.match[1]; // 'payme'
 
   // Защита от устаревшей кнопки в истории чата: провайдера могли выключить в настройках
   // уже после того, как это сообщение было отправлено юзеру.
@@ -221,19 +220,18 @@ async function initiatePayment(ctx, user, provider) {
 
   await usersRepo.updateStatus(user.id, 'pending');
 
-  const hasRealCreds =
-    provider === 'click' ? Boolean(config.click.serviceId && config.click.merchantId) : Boolean(config.payme.merchantId);
+  const hasRealCreds = Boolean(config.payme.merchantId);
 
   if (!hasRealCreds) {
     // Реальных merchant-данных провайдера ещё нет (см. .env.example) — показываем номер
-    // платежа текстом, чтобы можно было протестировать всё до касс Click/Payme.
+    // платежа текстом, чтобы можно было протестировать всё до кассы Payme.
     await showScreen(ctx, t(user.language, 'payment_created', amount, payment.merchant_trans_id), cancelPaymentKeyboard(user.language));
     return;
   }
 
   // Без return_url — после оплаты юзер просто остаётся в приложении провайдера, никакого
   // редиректа обратно (ни на сайт, ни в бота) не нужно.
-  const url = provider === 'click' ? buildClickPayUrl(payment, user) : buildPaymeCheckoutUrl(payment, user);
+  const url = buildPaymeCheckoutUrl(payment, user);
   await showScreen(ctx, t(user.language, 'payment_link_prompt'), paymentLinkKeyboard(user.language, url));
 }
 

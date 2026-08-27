@@ -5,3 +5,4 @@ npm-debug.log*
 .DS_Store
 backups/
 claude.exe
+id_rsa.ppk

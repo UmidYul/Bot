@@ -41,14 +41,6 @@ const DEFINITIONS = {
     },
     parse: (raw) => String(raw || '').trim(),
   },
-  click_enabled: {
-    type: 'checkbox',
-    get: () => config.click.enabled,
-    set: (v) => {
-      config.click.enabled = v;
-    },
-    parse: parseCheckbox,
-  },
   payme_enabled: {
     type: 'checkbox',
     get: () => config.payme.enabled,

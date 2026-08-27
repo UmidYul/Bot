@@ -14,13 +14,7 @@ async function main() {
     console.log(`HTTP-сервер запущен на порту ${config.port} (env: ${config.nodeEnv})`);
     // Не сами значения (секреты никогда не логируем), а факт их наличия — чтобы сразу было
     // видно в pm2 logs после рестарта, что процесс реально подхватил .env с реальными
-    // click/payme данными, а не пустышки/устаревший env из старого процесса.
-    console.log('[startup] click:', {
-      enabled: config.click.enabled,
-      service_id: config.click.serviceId || '(empty)',
-      merchant_id: config.click.merchantId || '(empty)',
-      secret_key_set: Boolean(config.click.secretKey),
-    });
+    // payme данными, а не пустышки/устаревший env из старого процесса.
     console.log('[startup] payme:', {
       enabled: config.payme.enabled,
       merchant_id: config.payme.merchantId || '(empty)',

@@ -24,7 +24,6 @@ module.exports = {
   back_button: '⬅️ Назад',
 
   choose_payment_method: 'Выберите способ оплаты:',
-  pay_click: '💳 Click',
   pay_payme: '💳 Payme',
   pay_admin: '👤 Оплата через администратора',
   provider_disabled: 'Этот способ оплаты сейчас недоступен. Пожалуйста, выберите другой на экране оплаты.',
@@ -39,7 +38,6 @@ module.exports = {
   receipt_id_label: 'Номер платежа',
   receipt_date_label: 'Дата',
   receipt_promo_label: 'Промокод',
-  provider_click: 'Click',
   provider_payme: 'Payme',
   provider_promo: 'Промокод (бесплатно)',
 

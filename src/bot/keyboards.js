@@ -35,7 +35,7 @@ function paymentMethodKeyboard(lang) {
     Markup.button.callback(t(lang, `pay_${provider}`), `pay:method:${provider}`)
   );
 
-  // Все внешние провайдеры можно выключить из настроек (например, Click на время
+  // Все внешние провайдеры можно выключить из настроек (например, на время
   // проблем) — пустой ряд кнопок Telegram API отклоняет как невалидную клавиатуру,
   // поэтому добавляем ряд только если в нём реально что-то есть.
   const rows = [];
@@ -52,7 +52,7 @@ function cancelPaymentKeyboard(lang) {
   return Markup.inlineKeyboard([[Markup.button.callback(t(lang, 'cancel_button'), 'pay:cancel')]]);
 }
 
-/** Ссылка на чекаут провайдера (Click/Payme) — кнопкой, а не голым текстом в сообщении. */
+/** Ссылка на чекаут провайдера (Payme) — кнопкой, а не голым текстом в сообщении. */
 function paymentLinkKeyboard(lang, url) {
   return Markup.inlineKeyboard([
     [Markup.button.url(t(lang, 'pay_open_button'), url)],
