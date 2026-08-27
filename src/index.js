@@ -3,6 +3,7 @@ const knex = require('./db');
 const buildApp = require('./app');
 const { bot } = require('./bot');
 const settingsService = require('./services/settingsService');
+const { logToFile } = require('./utils/webhookLogger');
 
 async function main() {
   // Настройки, отредактированные из админки (цена канала, инвайт-ссылка и т.д.),
@@ -25,6 +26,15 @@ async function main() {
       enabled: config.payme.enabled,
       merchant_id: config.payme.merchantId || '(empty)',
       secret_key_set: Boolean(config.payme.secretKey),
+    });
+    // Явный маркер рестарта в самом файле логов — если после реальной оплаты в
+    // logs/webhooks.log нет вообще НИЧЕГО (ни этой строки, ни запроса), значит процесс
+    // не перезапускался туда, куда думаем, либо это не тот файл/сервер, который смотрит
+    // клиент/логи читаются не там, где реально пишет процесс.
+    logToFile('process', 'startup', {
+      port: config.port,
+      web_base_url: config.webBaseUrl,
+      click_enabled: config.click.enabled,
     });
   });
 
@@ -73,9 +83,11 @@ async function main() {
   // с багом в SQL-запросе до этого фикса). Логируем и продолжаем жить, а не падаем.
   process.on('unhandledRejection', (reason) => {
     console.error('Необработанный отклонённый промис (процесс продолжает работу):', reason);
+    logToFile('process', 'unhandledRejection', { message: reason && reason.message ? reason.message : String(reason) });
   });
   process.on('uncaughtException', (err) => {
     console.error('Необработанное исключение (процесс продолжает работу):', err);
+    logToFile('process', 'uncaughtException', { message: err.message, stack: err.stack });
   });
 }
 
