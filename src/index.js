@@ -35,6 +35,15 @@ async function main() {
       port: config.port,
       web_base_url: config.webBaseUrl,
       click_enabled: config.click.enabled,
+      // service_id/merchant_id — не секреты (видны в самой платёжной ссылке), их можно
+      // сверять прямо по этому логу с кабинетом merchant.click.uz, не веря визуальной
+      // сверке .env "на глаз". Секретный ключ — только факт непустоты и его длина
+      // (чтобы отличить "не задан" от "задан, но не тот"), без самого значения.
+      click_service_id: config.click.serviceId || '(пусто)',
+      click_merchant_id: config.click.merchantId || '(пусто)',
+      click_merchant_user_id: config.click.merchantUserId || '(пусто)',
+      click_secret_key_set: Boolean(config.click.secretKey),
+      click_secret_key_length: config.click.secretKey ? config.click.secretKey.length : 0,
     });
   });
 
