@@ -36,6 +36,12 @@
       <div class="card-section-title"><%= t('settings_section_payments') %></div>
 
       <div class="checkbox-row">
+        <input type="checkbox" id="click_enabled" name="click_enabled" value="on" <%= values.click_enabled ? 'checked' : '' %> />
+        <label for="click_enabled"><%= t('settings_field_click_enabled') %></label>
+      </div>
+      <div class="field-hint"><%= t('settings_field_click_enabled_hint') %></div>
+
+      <div class="checkbox-row">
         <input type="checkbox" id="payme_enabled" name="payme_enabled" value="on" <%= values.payme_enabled ? 'checked' : '' %> />
         <label for="payme_enabled"><%= t('settings_field_payme_enabled') %></label>
       </div>

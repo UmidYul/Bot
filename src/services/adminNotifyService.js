@@ -24,7 +24,7 @@ async function notifyAdmins(message) {
 }
 
 function notifyNewPayment(user, payment) {
-  const providerLabel = { payme: 'Payme', promo: 'промокод' }[payment.provider] || payment.provider;
+  const providerLabel = { click: 'Click', payme: 'Payme', promo: 'промокод' }[payment.provider] || payment.provider;
   return notifyAdmins(
     `💰 <b>Новая оплата</b>\n` +
       `Юзер: <code>${user.code}</code>${user.username ? ` (@${user.username})` : ''}\n` +

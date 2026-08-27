@@ -61,7 +61,7 @@ async function resolveAccount(account) {
   const payment = await paymentsRepo.findByMerchantTransId(merchantTransId);
   if (payment) {
     // merchant_trans_id мог по крайне маловероятному совпадению принадлежать платежу,
-    // заведённому под другого провайдера (промокод) — не отдаём его чужому вебхуку.
+    // заведённому под другого провайдера (Click/промокод) — не отдаём его чужому вебхуку.
     if (payment.provider !== 'payme') return null;
     return { merchantTransId, payment, user: null };
   }
@@ -74,7 +74,7 @@ async function resolveAccount(account) {
 
 /**
  * Защита от повторной реальной оплаты: юзер мог оставить эту оплату "висеть" (не закрыл
- * страницу Payme), а доступ уже получить другим способом (промокод, второй платёж) —
+ * страницу Payme), а доступ уже получить другим способом (Click, промокод, второй платёж) —
  * или его успели заблокировать, пока платёж был в pending. Проверяем ДО списания денег
  * (CheckPerformTransaction/CreateTransaction), чтобы не доводить до реального списания —
  * в PerformTransaction эту проверку намеренно не дублируем: к этому моменту Payme уже мог

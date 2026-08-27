@@ -22,6 +22,7 @@ module.exports = {
   back_button: '⬅️ Orqaga',
 
   choose_payment_method: "To'lov usulini tanlang:",
+  pay_click: '💳 Click',
   pay_payme: '💳 Payme',
   pay_admin: "👤 Administrator orqali to'lash",
   provider_disabled: "Bu to'lov usuli hozircha mavjud emas. Iltimos, to'lov ekranida boshqa usulni tanlang.",
@@ -36,6 +37,7 @@ module.exports = {
   receipt_id_label: "To'lov raqami",
   receipt_date_label: 'Sana',
   receipt_promo_label: 'Promokod',
+  provider_click: 'Click',
   provider_payme: 'Payme',
   provider_promo: 'Promokod (bepul)',
 

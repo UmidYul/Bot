@@ -31,6 +31,16 @@ const config = {
 
   sessionSecret: process.env.SESSION_SECRET || 'dev-local-secret-change-in-production',
 
+  click: {
+    // Тумблер даём, чтобы можно было временно снять кнопку из бота (например, на время
+    // проблем у провайдера), не трогая код.
+    enabled: process.env.CLICK_ENABLED !== 'false',
+    serviceId: process.env.CLICK_SERVICE_ID || '',
+    merchantId: process.env.CLICK_MERCHANT_ID || '',
+    merchantUserId: process.env.CLICK_MERCHANT_USER_ID || '',
+    secretKey: process.env.CLICK_SECRET_KEY || '',
+  },
+
   payme: {
     // Временно отключено по просьбе заказчика — кнопка Payme скрыта из бота, вебхук
     // /payments/payme при этом остаётся рабочим на будущее. Включать через .env,
@@ -94,7 +104,7 @@ const config = {
 Object.defineProperty(config, 'enabledPaymentProviders', {
   enumerable: true,
   get() {
-    return [...(config.payme.enabled ? ['payme'] : [])];
+    return [...(config.click.enabled ? ['click'] : []), ...(config.payme.enabled ? ['payme'] : [])];
   },
 });
 

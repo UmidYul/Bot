@@ -64,7 +64,7 @@ bot.action('promo:cancel', handlePromoCancel);
 bot.action('pay:start', handlePayStart);
 bot.action('pay:back', handlePayBack);
 bot.action('pay:cancel', handlePayCancel);
-bot.action(/^pay:method:(payme)$/, handlePayMethod);
+bot.action(/^pay:method:(click|payme)$/, handlePayMethod);
 
 bot.on('contact', handleContact);
 
