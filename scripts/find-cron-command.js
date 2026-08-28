@@ -52,6 +52,14 @@ function buildCommand(activatePath) {
   return `source ${activatePath} && cd ${projectRoot} && node scripts/backup.js >> ${logFile} 2>&1`;
 }
 
+// cron выполняет команды с сильно урезанным PATH (не читает .bashrc/.bash_profile) — просто
+// "node" в интерактивном SSH может работать, а в cron дать "node: command not found".
+// process.execPath — абсолютный путь к бинарнику, которым прямо сейчас запущен этот скрипт,
+// от такой ловушки не зависит вообще.
+function buildCommandWithAbsoluteNode() {
+  return `cd ${projectRoot} && ${process.execPath} scripts/backup.js >> ${logFile} 2>&1`;
+}
+
 console.log(`Папка проекта (для "cd"):\n  ${projectRoot}\n`);
 
 const fromProcess = findActivateFromCurrentProcess();
@@ -76,12 +84,15 @@ if (fromProcess) {
     console.log(`  Команда: ${buildCommand(p)}\n`);
   });
 } else {
-  console.log(`Не нашёл ни одного nodevenv в ${nodevenvDir}.`);
-  console.log('Это нормально, если вы не на cPanel Node.js Selector (например, обычный VPS с системным Node) —');
-  console.log('тогда просто:\n');
-  console.log(`  cd ${projectRoot} && node scripts/backup.js >> ${logFile} 2>&1`);
-  console.log('\nЕсли это всё же cPanel — проверьте вручную в "Setup Node.js App" → ваше приложение →');
-  console.log('строку "To enter to the virtual environment, run the command:" и вставьте её вместо "source ...".');
+  console.log(`Не нашёл ни одного nodevenv в ${nodevenvDir} — похоже, node у вас просто доступен напрямую`);
+  console.log('(не через cPanel Node.js Selector virtualenv). Тогда используем абсолютный путь к node —');
+  console.log('это важно: у cron урезанный PATH, и голое "node" в cron-задаче может не найтись, даже если');
+  console.log('прямо сейчас команда "node ..." у вас в SSH отработала без проблем.\n');
+  console.log(`Путь к node, которым сейчас запущен этот скрипт:\n  ${process.execPath}\n`);
+  console.log('Готовая команда для поля "Command" в cPanel Cron Jobs:\n');
+  console.log(buildCommandWithAbsoluteNode());
+  console.log('\nЕсли это всё же cPanel и есть отдельный Node.js-апп через "Setup Node.js App" — проверьте там');
+  console.log('строку "To enter to the virtual environment, run the command:" и используйте вариант с "source" выше.');
 }
 
 console.log('\nПоля формы cPanel Cron Jobs: Минута=0, Час=3, День=*, Месяц=*, День недели=* (каждый день в 3:00).');
