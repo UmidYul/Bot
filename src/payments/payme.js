@@ -4,7 +4,9 @@ const usersRepo = require('../db/repositories/users');
 const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
-const { notifyNewPayment } = require('../services/adminNotifyService');
+const { sendUnderpaymentNotice } = require('../services/underpaymentNotice');
+const { notifyNewPayment, notifyUnderpayment } = require('../services/adminNotifyService');
+const { resolvePaymentOutcome } = require('../services/balanceService');
 
 // Стандартные коды ошибок Payme Merchant API.
 const ERROR = {
@@ -50,8 +52,8 @@ function checkAuth(authorizationHeader) {
  * Если платежа с таким merchant_trans_id ещё нет в БД — это может быть "оплата как за
  * коммуналку": юзер открыл приложение Payme напрямую, минуя бота, и ввёл свой код
  * лицевого счёта. В этом случае merchant_trans_id прилетает как есть (сам код), и мы
- * пробуем найти по нему юзера, чтобы завести платёж на лету — доступ выдаётся сразу по
- * фиксированной цене (config.channelPrice), это не пополнение произвольной суммой.
+ * пробуем найти по нему юзера, чтобы завести платёж на лету — суммой, которую реально
+ * прислал Payme (может быть меньше цены канала, см. createTransaction/balanceService.js).
  * @returns {Promise<{merchantTransId: string, payment: object|null, user: object|null}|null>}
  */
 async function resolveAccount(account) {
@@ -87,10 +89,9 @@ async function assertUserStillPayable(userId) {
   }
 }
 
-function amountsMatch(paymentAmountUzs, paymeAmountTiyin) {
-  // Payme передаёт сумму в тийинах (1 сум = 100 тийин), у нас в payments.amount — сумы.
-  const expectedTiyin = Math.round(Number(paymentAmountUzs) * 100);
-  return expectedTiyin === Number(paymeAmountTiyin);
+// Payme передаёт сумму в тийинах (1 сум = 100 тийин), у нас в payments.amount/users.balance — сумы.
+function tiyinToUzs(tiyin) {
+  return Number(tiyin) / 100;
 }
 
 function toRpcState(payment) {
@@ -116,19 +117,14 @@ async function checkPerformTransaction(params) {
 
   await logEvent(resolved.payment ? resolved.payment.id : null, 'CheckPerformTransaction', params);
 
+  // Сумма больше не сверяется здесь: пользователь мог платить меньше цены канала напрямую
+  // через приложение — недоплата зачисляется на внутренний счёт (см. balanceService.js),
+  // доступ выдаётся, когда накопленный счёт + платёж достигают config.channelPrice.
   if (resolved.payment) {
-    // Платёж уже заведён ботом (прямая покупка) — сумма должна совпадать с ожидаемой.
     if (resolved.payment.status !== 'pending') {
       throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
     }
-    if (!amountsMatch(resolved.payment.amount, params.amount)) {
-      throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
-    }
     await assertUserStillPayable(resolved.payment.user_id);
-  } else if (!amountsMatch(config.channelPrice, params.amount)) {
-    // Платёж ещё не существует — юзер платит напрямую по коду, минуя бота. Оплата
-    // разовая и по фиксированной цене, а не произвольная сумма.
-    throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
   }
 
   return { allow: true };
@@ -142,16 +138,14 @@ async function createTransaction(params) {
     if (!resolved) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
 
     // Платёж по коду ещё не заведён в БД — юзер платит вручную через приложение Payme,
-    // минуя бота. Заводим его на лету по фиксированной цене (config.channelPrice), а не
-    // суммой, которую прислал Payme — иначе доступ можно было бы получить, оплатив
-    // произвольную сумму (сверка ниже через amountsMatch всё равно её отклонит, но платёж
-    // не должен даже создаваться с "неправильной" ценой).
+    // минуя бота. Заводим его на лету суммой, которую реально прислал Payme (может быть
+    // меньше цены канала — недоплата зачисляется на внутренний счёт, см. balanceService.js).
     payment =
       resolved.payment ||
       (await paymentsRepo.createPayment({
         userId: resolved.user.id,
         provider: 'payme',
-        amount: config.channelPrice,
+        amount: tiyinToUzs(params.amount),
         merchantTransId: resolved.merchantTransId,
         status: 'pending',
       }));
@@ -160,9 +154,6 @@ async function createTransaction(params) {
 
     if (payment.status !== 'pending') {
       throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
-    }
-    if (!amountsMatch(payment.amount, params.amount)) {
-      throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
     }
     if (payment.provider_trans_id && payment.provider_trans_id !== params.id) {
       // На этот payment уже заведена другая транзакция Payme.
@@ -207,13 +198,26 @@ async function performTransaction(params) {
   }
 
   const paidAt = new Date();
-  const updated = await paymentsRepo.markPaid(payment.id, { paidAt });
+  const paidAmount = tiyinToUzs(params.amount);
+  // status='paid' здесь означает "транзакция закрыта провайдером", а не "пользователю выдан
+  // доступ" — см. комментарий в paymentsRepo.markPaid и resolvePaymentOutcome ниже.
+  const updated = await paymentsRepo.markPaid(payment.id, { paidAt, amount: paidAmount });
 
-  if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
-  const user = await usersRepo.updateStatus(payment.user_id, 'paid');
-  await grantAccess(user);
-  await sendReceipt(user, updated);
-  await notifyNewPayment(user, updated);
+  const user = await usersRepo.findById(payment.user_id);
+  const outcome = resolvePaymentOutcome(user.balance, paidAmount, config.channelPrice);
+
+  if (outcome.grantsAccess) {
+    if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
+    await usersRepo.setBalance(user.id, 0);
+    const updatedUser = await usersRepo.updateStatus(payment.user_id, 'paid');
+    await grantAccess(updatedUser);
+    await sendReceipt(updatedUser, updated);
+    await notifyNewPayment(updatedUser, updated);
+  } else {
+    const updatedUser = await usersRepo.incrementBalance(user.id, paidAmount);
+    await sendUnderpaymentNotice(updatedUser, { paidNow: paidAmount, remaining: outcome.remaining });
+    await notifyUnderpayment(updatedUser, updated, outcome.remaining);
+  }
 
   return {
     transaction: String(updated.id),

@@ -35,11 +35,20 @@ function findByProviderTransId(providerTransId) {
   return db('payments').where({ provider_trans_id: providerTransId }).first();
 }
 
-async function markPaid(id, { paidAt = new Date() } = {}) {
-  const [payment] = await db('payments')
-    .where({ id })
-    .update({ status: 'paid', paid_at: paidAt, updated_at: db.fn.now() })
-    .returning('*');
+/**
+ * status='paid' здесь означает "провайдер подтвердил перевод по этой транзакции", а не
+ * "пользователю выдан доступ" — при недоплате (см. src/services/balanceService.js) деньги уже
+ * реально пришли, но доступ выдаётся только когда баланс пользователя в сумме с этим платежом
+ * достигает цены канала. Именно поэтому повторный Complete/Perform по недоплаченной строке
+ * идемпотентен: попадает в ветку "уже paid" и не начисляет баланс дважды.
+ * amount — если передан, перезаписывает сумму строки на реально пришедшую от провайдера
+ * (при создании on-the-fly платежа сумма могла быть только заявленной).
+ */
+async function markPaid(id, { paidAt = new Date(), amount } = {}) {
+  const update = { status: 'paid', paid_at: paidAt, updated_at: db.fn.now() };
+  if (amount !== undefined) update.amount = amount;
+
+  const [payment] = await db('payments').where({ id }).update(update).returning('*');
   return payment;
 }
 

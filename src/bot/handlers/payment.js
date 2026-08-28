@@ -18,10 +18,15 @@ const {
 } = require('../keyboards');
 const { showPaymentScreen, routeExistingUser } = require('./start');
 
-function resetPaymentSession(ctx) {
+/**
+ * Сумма к оплате уменьшается на уже накопленный внутренний счёт (недоплата через Click/Payme,
+ * см. balanceService.js) — так кнопка "Доплатить" в сообщении о недоплате (см.
+ * underpaymentNotice.js) ведёт на этот же экран и сразу просит только остаток.
+ */
+function resetPaymentSession(ctx, user) {
   ctx.session.awaitingPromo = false;
   ctx.session.promoCodeId = null;
-  ctx.session.finalAmount = config.channelPrice;
+  ctx.session.finalAmount = Math.max(0, config.channelPrice - Number(user.balance || 0));
 }
 
 /**
@@ -74,13 +79,20 @@ async function handlePayStart(ctx) {
   const user = ctx.state.user;
   if (!(await guardActionable(ctx, user))) return;
 
-  ctx.session.awaitingPromo = false;
-  ctx.session.promoCodeId = null;
-  ctx.session.finalAmount = config.channelPrice;
-
+  resetPaymentSession(ctx, user);
   await ctx.answerCbQuery();
-  // "Мой счёт" — всегда полноценная альтернатива внешним провайдерам, поэтому экран выбора
-  // способа показываем всегда, даже если внешний провайдер ровно один.
+
+  if (ctx.session.finalAmount <= 0) {
+    // Подстраховка от гонки: баланс уже покрывает цену канала (в норме к этому моменту
+    // вебхук уже выдал доступ и обнулил баланс сам) — не показываем экран оплаты на 0 сум.
+    await usersRepo.setBalance(user.id, 0);
+    const updatedUser = await usersRepo.updateStatus(user.id, 'paid');
+    ctx.state.user = updatedUser;
+    await closeScreen(ctx);
+    await grantAccess(updatedUser);
+    return;
+  }
+
   await showPaymentMethodScreen(ctx, user);
 }
 
@@ -88,7 +100,7 @@ async function handlePayBack(ctx) {
   const user = ctx.state.user;
   if (!user) return;
 
-  resetPaymentSession(ctx);
+  resetPaymentSession(ctx, user);
   await ctx.answerCbQuery();
   await showPaymentScreen(ctx, user);
 }
@@ -202,7 +214,7 @@ async function handlePayCancel(ctx) {
   if (!(await guardActionable(ctx, user))) return;
 
   await ctx.answerCbQuery();
-  resetPaymentSession(ctx);
+  resetPaymentSession(ctx, user);
   await showPaymentScreen(ctx, user);
 }
 

@@ -34,6 +34,18 @@ function notifyNewPayment(user, payment) {
   );
 }
 
+function notifyUnderpayment(user, payment, remaining) {
+  const providerLabel = { click: 'Click', payme: 'Payme' }[payment.provider] || payment.provider;
+  return notifyAdmins(
+    `⚠️ <b>Неполная оплата</b>\n` +
+      `Юзер: <code>${user.code}</code>${user.username ? ` (@${user.username})` : ''}\n` +
+      `Оплачено: <b>${Number(payment.amount).toLocaleString('ru-RU')} ${payment.currency || 'UZS'}</b>, ` +
+      `не хватает: <b>${Number(remaining).toLocaleString('ru-RU')} ${payment.currency || 'UZS'}</b>\n` +
+      `Способ: ${providerLabel}\n` +
+      `Платёж: <code>${payment.merchant_trans_id}</code>`
+  );
+}
+
 function notifyPromoLockout(user, code) {
   return notifyAdmins(
     `⚠️ <b>Подозрительная активность</b>\n` +
@@ -46,4 +58,4 @@ function notifyBotError(updateId, err) {
   return notifyAdmins(`🐞 <b>Ошибка в боте</b>\nUpdate #${updateId}\n<code>${String(err && err.message ? err.message : err)}</code>`);
 }
 
-module.exports = { setBot, notifyAdmins, notifyNewPayment, notifyPromoLockout, notifyBotError };
+module.exports = { setBot, notifyAdmins, notifyNewPayment, notifyUnderpayment, notifyPromoLockout, notifyBotError };

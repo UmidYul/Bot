@@ -5,7 +5,9 @@ const usersRepo = require('../db/repositories/users');
 const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
-const { notifyNewPayment } = require('../services/adminNotifyService');
+const { sendUnderpaymentNotice } = require('../services/underpaymentNotice');
+const { notifyNewPayment, notifyUnderpayment } = require('../services/adminNotifyService');
+const { resolvePaymentOutcome } = require('../services/balanceService');
 const { logToFile } = require('../utils/webhookLogger');
 
 // Стандартные коды ошибок Click Shop API (docs.click.uz/en/click-api-request/).
@@ -73,10 +75,6 @@ function verifySignature(payload) {
   return expected === String(payload.sign_string || '').toLowerCase();
 }
 
-function amountsMatch(a, b) {
-  return Math.abs(Number(a) - Number(b)) < 0.01;
-}
-
 async function logEvent(paymentId, event, payload) {
   if (!paymentId) return;
   await paymentsRepo.addEvent({ paymentId, provider: 'click', event, payload });
@@ -86,12 +84,13 @@ async function logEvent(paymentId, event, payload) {
  * Находит платёж по merchant_trans_id, а если такого ещё нет — пробует найти юзера по
  * этому же значению как по коду и завести платёж на лету. Это сценарий "оплата как за
  * коммуналку": юзер открывает приложение Click напрямую, минуя бота, вводит свой код —
- * никакого платежа в БД на этот момент ещё не существует. Сумма всегда фиксированная
- * (config.channelPrice), а не то, что прислал Click в payload.amount — иначе можно было бы
- * получить доступ, оплатив через приложение любую произвольную (например, 1) сумму;
- * реальная сверка суммы происходит чуть ниже через amountsMatch(payment.amount, payload.amount).
+ * никакого платежа в БД на этот момент ещё не существует. Сумма платежа — то, что реально
+ * прислал Click в payload.amount (пользователь мог ввести в приложении любую сумму, в т.ч.
+ * меньше цены канала — недоплата зачисляется на внутренний счёт, см. balanceService.js и
+ * handleComplete ниже); реальный контроль не в отклонении "неправильной" суммы, а в том, что
+ * доступ выдаётся только когда накопленный счёт + этот платёж достигают config.channelPrice.
  */
-async function resolveOrCreatePayment(merchantTransId) {
+async function resolveOrCreatePayment(merchantTransId, amount) {
   const existing = await paymentsRepo.findByMerchantTransId(merchantTransId);
   if (existing) {
     // merchant_trans_id мог по крайне маловероятному совпадению принадлежать платежу,
@@ -105,7 +104,7 @@ async function resolveOrCreatePayment(merchantTransId) {
   return paymentsRepo.createPayment({
     userId: user.id,
     provider: 'click',
-    amount: config.channelPrice,
+    amount,
     merchantTransId,
     status: 'pending',
   });
@@ -143,7 +142,7 @@ async function handlePrepare(payload) {
     return { error: ERROR.SIGN_CHECK_FAILED, error_note: 'SIGN CHECK FAILED' };
   }
 
-  const payment = await resolveOrCreatePayment(payload.merchant_trans_id);
+  const payment = await resolveOrCreatePayment(payload.merchant_trans_id, payload.amount);
   log('PREPARE resolveOrCreatePayment', {
     merchant_trans_id: payload.merchant_trans_id,
     found: Boolean(payment),
@@ -165,10 +164,6 @@ async function handlePrepare(payload) {
   if (payment.status !== 'pending') {
     log('PREPARE rejected: payment status is not pending', { payment_id: payment.id, status: payment.status });
     return { error: ERROR.TRANSACTION_CANCELLED, error_note: 'Order is not payable' };
-  }
-  if (!amountsMatch(payment.amount, payload.amount)) {
-    log('PREPARE rejected: amount mismatch', { payment_id: payment.id, expected: payment.amount, received: payload.amount });
-    return { error: ERROR.INVALID_AMOUNT, error_note: 'Incorrect amount' };
   }
   if (payment.provider_trans_id && payment.provider_trans_id !== String(payload.click_trans_id)) {
     // На этот payment уже заведена другая транзакция Click.
@@ -257,16 +252,17 @@ async function handleComplete(payload) {
     return { error: ERROR.SUCCESS, error_note: 'Success' };
   }
 
-  if (!amountsMatch(payment.amount, payload.amount)) {
-    log('COMPLETE rejected: amount mismatch', { payment_id: payment.id, expected: payment.amount, received: payload.amount });
-    return { error: ERROR.INVALID_AMOUNT, error_note: 'Incorrect amount' };
-  }
   if (payment.status !== 'pending') {
     log('COMPLETE rejected: payment status is not pending', { payment_id: payment.id, status: payment.status });
     return { error: ERROR.TRANSACTION_CANCELLED, error_note: 'Order is not payable' };
   }
 
-  const paid = await paymentsRepo.markPaid(payment.id);
+  // Сумма больше не сверяется с "ожидаемой" — пользователь мог заплатить меньше цены канала
+  // напрямую в приложении Click; markPaid ниже перезаписывает amount на то, что реально
+  // пришло, чтобы payments оставалась достоверным журналом. status='paid' здесь означает
+  // "эта транзакция закрыта провайдером", а не "пользователю выдан доступ" — см. комментарий
+  // в paymentsRepo.markPaid.
+  const paid = await paymentsRepo.markPaid(payment.id, { amount: Number(payload.amount) });
   log('COMPLETE markPaid done', { payment_id: paid.id, status: paid.status, paid_at: paid.paid_at });
 
   // С этой точки деньги уже списаны и payment.status='paid' уже закоммичен в Postgres — что бы
@@ -275,12 +271,23 @@ async function handleComplete(payload) {
   // безопасно — выше есть идемпотентная ветка), либо оставит транзакцию в подвешенном
   // состоянии на своей стороне, хотя деньги уже наши и заказ уже оплачен.
   try {
-    if (payment.promo_code_id) await promoCodesRepo.incrementUsage(payment.promo_code_id);
-    const updatedUser = await usersRepo.updateStatus(payment.user_id, 'paid');
-    log('COMPLETE user status updated', { user_id: updatedUser.id, status: updatedUser.status });
-    await grantAccess(updatedUser);
-    await sendReceipt(updatedUser, paid);
-    await notifyNewPayment(updatedUser, paid);
+    const user = await usersRepo.findById(payment.user_id);
+    const outcome = resolvePaymentOutcome(user.balance, payload.amount, config.channelPrice);
+    log('COMPLETE balance outcome', { payment_id: paid.id, user_id: user.id, balance_before: user.balance, ...outcome });
+
+    if (outcome.grantsAccess) {
+      if (payment.promo_code_id) await promoCodesRepo.incrementUsage(payment.promo_code_id);
+      await usersRepo.setBalance(user.id, 0);
+      const updatedUser = await usersRepo.updateStatus(payment.user_id, 'paid');
+      log('COMPLETE user status updated', { user_id: updatedUser.id, status: updatedUser.status });
+      await grantAccess(updatedUser);
+      await sendReceipt(updatedUser, paid);
+      await notifyNewPayment(updatedUser, paid);
+    } else {
+      const updatedUser = await usersRepo.incrementBalance(user.id, Number(payload.amount));
+      await sendUnderpaymentNotice(updatedUser, { paidNow: payload.amount, remaining: outcome.remaining });
+      await notifyUnderpayment(updatedUser, paid, outcome.remaining);
+    }
   } catch (err) {
     console.error('[click] COMPLETE post-payment step failed (payment is already marked paid in DB):', err);
   }

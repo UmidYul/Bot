@@ -76,6 +76,24 @@ async function unblockUser(id) {
   return user;
 }
 
+/**
+ * Атомарный инкремент внутреннего счёта (недоплата через Click/Payme, см.
+ * src/services/balanceService.js) — через SQL-выражение, а не read-modify-write, чтобы два
+ * почти одновременных недоплаченных платежа не затёрли начисление друг друга.
+ */
+async function incrementBalance(id, delta) {
+  const [user] = await db('users')
+    .where({ id })
+    .update({ balance: db.raw('balance + ?', [delta]), updated_at: db.fn.now() })
+    .returning('*');
+  return user;
+}
+
+async function setBalance(id, balance) {
+  const [user] = await db('users').where({ id }).update({ balance, updated_at: db.fn.now() }).returning('*');
+  return user;
+}
+
 /** Мягкое удаление — платежи и логи не трогаются (нужны для отчётности), юзер просто
  * пропадает из активного списка. */
 async function deleteUser(id) {
@@ -183,6 +201,8 @@ module.exports = {
   updateLanguage,
   updatePhone,
   updateUsername,
+  incrementBalance,
+  setBalance,
   blockUser,
   unblockUser,
   deleteUser,

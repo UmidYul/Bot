@@ -37,6 +37,11 @@ module.exports = {
   receipt_id_label: "To'lov raqami",
   receipt_date_label: 'Sana',
   receipt_promo_label: 'Promokod',
+
+  underpayment_notice: (paid, remaining) =>
+    `To'lov qabul qilindi: <b>${formatAmount(paid)} UZS</b>.\nKirish huquqi uchun yetishmayapti: <b>${formatAmount(remaining)} UZS</b>.`,
+  topup_button: "💳 Qolganini to'lash",
+
   provider_click: 'Click',
   provider_payme: 'Payme',
   provider_promo: 'Promokod (bepul)',

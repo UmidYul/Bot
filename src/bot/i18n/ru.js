@@ -39,6 +39,11 @@ module.exports = {
   receipt_id_label: 'Номер платежа',
   receipt_date_label: 'Дата',
   receipt_promo_label: 'Промокод',
+
+  underpayment_notice: (paid, remaining) =>
+    `Оплата получена: <b>${formatAmount(paid)} UZS</b>.\nДо получения доступа не хватает: <b>${formatAmount(remaining)} UZS</b>.`,
+  topup_button: '💳 Доплатить',
+
   provider_click: 'Click',
   provider_payme: 'Payme',
   provider_promo: 'Промокод (бесплатно)',

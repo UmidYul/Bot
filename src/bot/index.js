@@ -22,12 +22,14 @@ const accessService = require('../services/accessService');
 const receiptService = require('../services/receiptService');
 const adminNotifyService = require('../services/adminNotifyService');
 const broadcastService = require('../services/broadcastService');
+const underpaymentNotice = require('../services/underpaymentNotice');
 
 const bot = new Telegraf(config.botToken || 'invalid-token-placeholder');
 accessService.setBot(bot);
 receiptService.setBot(bot);
 adminNotifyService.setBot(bot);
 broadcastService.setBot(bot);
+underpaymentNotice.setBot(bot);
 
 bot.telegram
   .setMyCommands([

@@ -222,6 +222,10 @@ router.post(
         status: 'paid',
       });
       await paymentsRepo.markPaid(payment.id);
+      // Ручная выдача обходит вебхуки Click/Payme, которые сами обнуляют users.balance при
+      // достижении порога (см. balanceService.js) — без этого "зависший" баланс от прежней
+      // недоплаты остался бы висеть на юзере, которому только что выдали доступ вручную.
+      await usersRepo.setBalance(user.id, 0);
     }
 
     const updated = await usersRepo.updateStatus(user.id, newStatus);
