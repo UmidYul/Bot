@@ -54,8 +54,52 @@ function notifyPromoLockout(user, code) {
   );
 }
 
+/** Юзер несколько раз подряд оплатил меньше нужной суммы — сами недоплаты по-прежнему
+ * зачисляются на баланс, троттлится только поток уведомлений (см. usersRepo.registerUnderpaymentNotice). */
+function notifyUnderpaymentLockout(user) {
+  return notifyAdmins(
+    `⚠️ <b>Подозрительная активность</b>\n` +
+      `Юзер <code>${user.code}</code>${user.username ? ` (@${user.username})` : ''} несколько раз подряд оплатил меньше нужной ` +
+      `суммы и временно не будет получать уведомления о недоплате (сама недоплата на баланс зачисляется как обычно).`
+  );
+}
+
+/** Несколько неверных паролей подряд для одного логина в веб-админке — похоже на подбор
+ * пароля, аккаунт временно заблокирован (см. adminsRepo.recordFailedLogin). */
+function notifyAdminLoginLockout(login, ip) {
+  return notifyAdmins(
+    `⚠️ <b>Подозрительная активность в админке</b>\n` +
+      `Несколько неверных паролей подряд для логина <code>${login}</code>` +
+      `${ip ? ` (IP: <code>${ip}</code>)` : ''} — аккаунт временно заблокирован для входа.`
+  );
+}
+
 function notifyBotError(updateId, err) {
   return notifyAdmins(`🐞 <b>Ошибка в боте</b>\nUpdate #${updateId}\n<code>${String(err && err.message ? err.message : err)}</code>`);
 }
 
-module.exports = { setBot, notifyAdmins, notifyNewPayment, notifyUnderpayment, notifyPromoLockout, notifyBotError };
+/**
+ * Деньги по платежу уже приняты (markPaid закоммичен), но что-то после этого упало —
+ * начисление баланса/выдача доступа/уведомление могли не выполниться до конца. Парный случай
+ * к notifyBotError: там ошибка в обработке апдейта бота, здесь — уже после реального списания.
+ */
+function notifyPostPaymentFailure(provider, paymentId, err) {
+  return notifyAdmins(
+    `🐞 <b>Сбой после оплаты (${provider})</b>\n` +
+      `Платёж: <code>${paymentId}</code>\n` +
+      `<code>${String(err && err.message ? err.message : err)}</code>\n` +
+      `Деньги уже приняты — проверьте вручную баланс/доступ этого платежа.`
+  );
+}
+
+module.exports = {
+  setBot,
+  notifyAdmins,
+  notifyNewPayment,
+  notifyUnderpayment,
+  notifyPromoLockout,
+  notifyUnderpaymentLockout,
+  notifyAdminLoginLockout,
+  notifyBotError,
+  notifyPostPaymentFailure,
+};

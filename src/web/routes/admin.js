@@ -1,8 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 
+const config = require('../../config');
 const requireAuth = require('../middleware/requireAuth');
 const adminLocale = require('../middleware/adminLocale');
+const csrf = require('../middleware/csrf');
 const asyncHandler = require('../middleware/asyncHandler');
 const adminsRepo = require('../../db/repositories/admins');
 const usersRepo = require('../../db/repositories/users');
@@ -12,11 +14,12 @@ const adminLogsRepo = require('../../db/repositories/adminLogs');
 const settingsService = require('../../services/settingsService');
 const { revokeAccess, grantAccess } = require('../../services/accessService');
 const broadcastService = require('../../services/broadcastService');
-const { notifyAdmins } = require('../../services/adminNotifyService');
+const { notifyAdmins, notifyAdminLoginLockout } = require('../../services/adminNotifyService');
 
 const router = express.Router();
 
 router.use(adminLocale);
+router.use(csrf);
 
 // --- Язык интерфейса админки ---
 
@@ -40,18 +43,50 @@ router.post(
     const { login, password } = req.body;
     const admin = login ? await adminsRepo.findByLogin(login) : null;
 
+    // Защита от подбора пароля: аккаунт временно заблокирован после N неверных паролей
+    // подряд (см. config.adminLoginAntiSpam) — не проверяем пароль вообще, пока не истечёт
+    // блокировка.
+    if (admin && admin.locked_until && new Date(admin.locked_until) > new Date()) {
+      return res.render('login', { title: res.locals.t('login_title'), error: res.locals.t('login_locked') });
+    }
+
     const ok = admin && (await bcrypt.compare(password || '', admin.password_hash));
     if (!ok) {
+      if (admin) {
+        const { locked } = await adminsRepo.recordFailedLogin(
+          admin.id,
+          config.adminLoginAntiSpam.maxAttempts,
+          config.adminLoginAntiSpam.lockoutMinutes
+        );
+        if (locked) await notifyAdminLoginLockout(admin.login, req.ip);
+      }
       return res.render('login', { title: res.locals.t('login_title'), error: res.locals.t('login_error') });
     }
 
+    await adminsRepo.resetFailedLogins(admin.id);
+
+    // Защита от session fixation: до логина сессия уже могла существовать (например, юзер
+    // переключил язык на экране логина — /admin/lang/:lang создаёт сессию до всякой
+    // аутентификации), и её id мог быть заранее известен атакующему (подсунут жертве через
+    // ссылку/куку). regenerate() выдаёт НОВЫЙ session id при успешном логине — старый (если
+    // кто-то его знал) больше ни на что не годен. adminLang переносим вручную, иначе выбор
+    // языка на экране логина слетел бы после входа.
+    const adminLang = req.session.adminLang;
+    await new Promise((resolve, reject) => {
+      req.session.regenerate((err) => (err ? reject(err) : resolve()));
+    });
+
     req.session.adminId = admin.id;
     req.session.adminLogin = admin.login;
+    if (adminLang) req.session.adminLang = adminLang;
     res.redirect('/admin/users');
   })
 );
 
-router.get('/logout', (req, res) => {
+// POST, а не GET: логаут меняет состояние (уничтожает сессию) — GET-ссылку можно было бы
+// незаметно для админа дёрнуть с чужой страницы (img src, prefetch и т.п.), теперь этот
+// запрос требует CSRF-токен, как и остальные мутирующие действия в панели (см. csrf.js).
+router.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/admin/login'));
 });
 

@@ -6,7 +6,7 @@
 
 <div class="toolbar">
   <form method="GET" action="/admin/users">
-    <input type="text" name="q" placeholder="<%= t('users_search_placeholder') %>" value="<%= filters.q || '' %>" style="width:220px" />
+    <input type="text" name="q" placeholder="<%= t('users_search_placeholder') %>" value="<%= filters.q || '' %>" />
     <select name="status">
       <option value=""><%= t('users_filter_all_statuses') %></option>
       <% ['new','pending','paid'].forEach(function (s) { %>
@@ -15,12 +15,12 @@
       <option value="blocked" <%= filters.status === 'blocked' ? 'selected' : '' %>><%= t('users_filter_blocked') %></option>
     </select>
     <% if (filters.deleted) { %><input type="hidden" name="deleted" value="1" /><% } %>
-    <button type="submit" class="btn"><%= t('users_search_submit') %></button>
+    <button type="submit" class="btn btn-primary"><%= t('users_search_submit') %></button>
   </form>
   <% if (filters.deleted) { %>
-    <a href="/admin/users" class="btn btn-sm"><%= t('users_show_active_link') %></a>
+    <a href="/admin/users" class="btn"><%= t('users_show_active_link') %></a>
   <% } else { %>
-    <a href="/admin/users?deleted=1" class="btn btn-sm"><%= t('users_show_deleted_link') %></a>
+    <a href="/admin/users?deleted=1" class="btn"><%= t('users_show_deleted_link') %></a>
   <% } %>
 </div>
 

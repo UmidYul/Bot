@@ -94,6 +94,48 @@ async function setBalance(id, balance) {
   return user;
 }
 
+/**
+ * Анти-спам для уведомлений о недоплате (см. config.underpaymentAntiSpam), по аналогии с
+ * промо-анти-спамом, но хранится в БД — решение принимается из вебхука Click/Payme, где
+ * bot-сессии нет. Троттлит только сами уведомления юзеру/админу, не зачисление на баланс.
+ * Не строго атомарно под конкурентностью (read-then-write) — это осознанный компромисс:
+ * ошибиться на пару "лишних" уведомлений не страшно, в отличие от денежного баланса.
+ * @returns {Promise<{shouldNotify: boolean, justLocked: boolean}>} justLocked — именно этот
+ *   вызов довёл счётчик до лимита и включил блокировку (админу стоит уведомить один раз,
+ *   а не на каждую последующую подавленную попытку).
+ */
+async function registerUnderpaymentNotice(id, maxAttempts, lockoutMinutes) {
+  const user = await db('users').where({ id }).first();
+  const now = new Date();
+
+  if (user.underpayment_locked_until && new Date(user.underpayment_locked_until) > now) {
+    return { shouldNotify: false, justLocked: false };
+  }
+
+  // Если блокировка уже истекла — начинаем счёт заново, а не продолжаем со старого значения.
+  const wasLocked = Boolean(user.underpayment_locked_until);
+  const count = (wasLocked ? 0 : user.underpayment_notice_count) + 1;
+  const justLocked = count >= maxAttempts;
+
+  if (justLocked) {
+    await db('users')
+      .where({ id })
+      .update({
+        underpayment_notice_count: 0,
+        underpayment_locked_until: new Date(now.getTime() + lockoutMinutes * 60 * 1000),
+        updated_at: db.fn.now(),
+      });
+  } else {
+    await db('users')
+      .where({ id })
+      .update({ underpayment_notice_count: count, underpayment_locked_until: null, updated_at: db.fn.now() });
+  }
+
+  // Уведомление, которым счёт как раз добрался до лимита, всё ещё отправляем — молчаливая
+  // блокировка без единого объяснения выглядела бы для юзера как "бот сломался".
+  return { shouldNotify: true, justLocked };
+}
+
 /** Мягкое удаление — платежи и логи не трогаются (нужны для отчётности), юзер просто
  * пропадает из активного списка. */
 async function deleteUser(id) {
@@ -203,6 +245,7 @@ module.exports = {
   updateUsername,
   incrementBalance,
   setBalance,
+  registerUnderpaymentNotice,
   blockUser,
   unblockUser,
   deleteUser,

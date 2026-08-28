@@ -36,4 +36,19 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
-module.exports = { validatePromoCode, calculateFinalAmount };
+/**
+ * Целевая цена конкретного платежа для порога недоплаты (см. balanceService.js) — с учётом
+ * промокода, если он был применён (payments.promo_code_id). Без промокода — полная цена
+ * канала; так оплата напрямую через приложение (минуя бота, без промокода) по-прежнему
+ * сверяется с config.channelPrice, а оплата по промокоду — со скидочной ценой, как и было
+ * до введения внутреннего счёта.
+ * @param {number} channelPrice
+ * @param {number|null} promoCodeId
+ */
+async function resolveTargetPrice(channelPrice, promoCodeId) {
+  if (!promoCodeId) return channelPrice;
+  const promo = await promoCodesRepo.findById(promoCodeId);
+  return calculateFinalAmount(channelPrice, promo);
+}
+
+module.exports = { validatePromoCode, calculateFinalAmount, resolveTargetPrice };

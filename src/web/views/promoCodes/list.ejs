@@ -33,7 +33,7 @@
           <td data-label="<%= t('promo_col_active') %>"><%= p.is_active ? t('yes') : t('no') %></td>
           <td class="no-stack">
             <div class="actions">
-              <a href="/admin/promo-codes/<%= p.id %>/edit" class="js-edit-promo" data-promo="<%- JSON.stringify({
+              <a href="/admin/promo-codes/<%= p.id %>/edit" class="js-edit-promo btn btn-sm" data-promo="<%- JSON.stringify({
                 id: p.id,
                 code: p.code,
                 type: p.type,
@@ -43,6 +43,7 @@
                 is_active: p.is_active,
               }).replace(/"/g, '&quot;') %>"><%= t('promo_edit_link') %></a>
               <form method="POST" action="/admin/promo-codes/<%= p.id %>/toggle" class="inline-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
                 <button type="submit" class="btn btn-sm"><%= p.is_active ? t('promo_deactivate') : t('promo_activate') %></button>
               </form>
             </div>
@@ -67,6 +68,7 @@
     <div class="flash flash-error" id="promoModalError" hidden></div>
 
     <form id="promoForm" method="POST" action="/admin/promo-codes/new">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
       <div class="field">
         <label for="modal_code"><%= t('promo_field_code') %></label>
         <div style="display:flex;gap:8px">

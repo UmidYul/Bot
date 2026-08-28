@@ -1,4 +1,4 @@
-<p><a href="/admin/promo-codes"><%= t('promo_form_back') %></a></p>
+<div class="page-back"><a href="/admin/promo-codes" class="btn btn-sm"><%= t('promo_form_back') %></a></div>
 <h1><%= promoCode ? t('promo_form_title_edit') : t('promo_form_title_new') %></h1>
 
 <% if (error) { %>
@@ -7,6 +7,7 @@
 
 <div class="card" style="max-width:480px">
   <form method="POST" action="<%= promoCode ? '/admin/promo-codes/' + promoCode.id + '/edit' : '/admin/promo-codes/new' %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="field">
       <label for="code"><%= t('promo_field_code') %></label>
       <div style="display:flex;gap:8px">

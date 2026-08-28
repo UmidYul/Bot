@@ -19,6 +19,17 @@ async function handleChatJoinRequest(ctx) {
     return;
   }
 
+  if (user.deleted_at) {
+    await ctx.declineChatJoinRequest(telegramId).catch(() => {});
+    await adminLogsRepo.log({
+      adminId: null,
+      action: 'join_request_auto',
+      targetUserId: user.id,
+      meta: { telegramId, decision: 'decline', reason: 'deleted' },
+    });
+    return;
+  }
+
   if (user.blocked_at) {
     await ctx.declineChatJoinRequest(telegramId).catch(() => {});
     await adminLogsRepo.log({

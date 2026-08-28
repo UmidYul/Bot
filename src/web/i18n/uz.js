@@ -15,6 +15,7 @@ module.exports = {
   login_field_password: 'Parol',
   login_submit: 'Kirish',
   login_error: "Login yoki parol noto'g'ri",
+  login_locked: "Juda ko'p noto'g'ri urinish. Birozdan so'ng qayta urinib ko'ring.",
 
   users_title: 'Foydalanuvchilar',
   users_search_placeholder: 'Kod / telefon / username',
@@ -53,6 +54,7 @@ module.exports = {
   btn_delete: "O'chirish",
   btn_restore: 'Tiklash',
   confirm_delete: "Foydalanuvchini o'chirasizmi? U ro'yxatdan yashiriladi — to'lovlar va loglar saqlanadi.",
+  confirm_status_change: (value) => `Holatni «${value}»ga o'zgartirasizmi? Bu to'lov jarayoniga qo'lda aralashuv.`,
 
   section_status_override: "Holatni qo'lda o'zgartirish",
   status_override_hint: "To'lovsiz kirish huquqini berish (to'lovlar tarixiga yoziladi) yoki holatni tiklash.",

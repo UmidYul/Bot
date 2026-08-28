@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { calculateFinalAmount } = require('./promoService');
+const { calculateFinalAmount, resolveTargetPrice } = require('./promoService');
+const promoCodesRepo = require('../db/repositories/promoCodes');
 
 test('без промокода возвращает исходную цену', () => {
   assert.equal(calculateFinalAmount(100000, null), 100000);
@@ -24,4 +25,15 @@ test('free-промокод даёт нулевую сумму', () => {
 
 test('округляет до 2 знаков после запятой', () => {
   assert.equal(calculateFinalAmount(99999, { type: 'percent', value: 33 }), 66999.33);
+});
+
+test('resolveTargetPrice без promoCodeId возвращает полную цену канала', async () => {
+  const price = await resolveTargetPrice(100000, null);
+  assert.equal(price, 100000);
+});
+
+test('resolveTargetPrice с promoCodeId возвращает цену со скидкой промокода', async (t) => {
+  t.mock.method(promoCodesRepo, 'findById', async () => ({ type: 'percent', value: 20 }));
+  const price = await resolveTargetPrice(100000, 42);
+  assert.equal(price, 80000);
 });

@@ -229,6 +229,12 @@ a:hover {
 }
 
 .logout-link {
+  /* Логаут теперь POST-форма (см. web/routes/admin.js) — кнопка сброшена до вида ссылки,
+     чтобы визуально ничего не поменялось. */
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
   color: var(--text-muted);
   font-size: 13px;
   padding: 6px 10px;
@@ -399,6 +405,23 @@ tbody tr:last-child td {
   align-items: center;
   flex-wrap: wrap;
 }
+/* input/select ниже глобально width:100% (нужно внутри вертикальных .field) — внутри
+   горизонтального flex-тулбара это заставляет каждое поле требовать всю ширину строки,
+   и они "воюют" друг с другом за место вместо аккуратного распределения (отсюда съехавший
+   ряд фильтров: поле в одну строку, кнопка — уже на следующей). flex-basis вместо width
+   даёт полям делить пространство пропорционально и переноситься на новую строку ВМЕСТЕ,
+   а не по одному. */
+.toolbar form input,
+.toolbar form select {
+  width: auto;
+  flex: 1 1 180px;
+}
+/* Кнопки/ссылки-кнопки в тулбаре не должны тянуться под ширину поля — только сами поля. */
+.toolbar form button,
+.toolbar > .btn,
+.toolbar > a.btn {
+  flex: none;
+}
 
 input[type='text'],
 input[type='password'],
@@ -532,6 +555,13 @@ label:first-child {
 }
 .btn-block {
   width: 100%;
+}
+
+/* Обёртка над "← Назад"-ссылками (users/detail.ejs, promoCodes/form.ejs) — раньше это был
+   голый <a> текстом в <p>, теперь настоящая .btn-кнопка; обёртка просто задаёт отступ снизу
+   вместо дефолтного margin у <p>. */
+.page-back {
+  margin-bottom: var(--space-4);
 }
 
 /* ===== Badges ===== */
@@ -868,5 +898,41 @@ label:first-child {
   }
   .status-form select {
     width: 100%;
+  }
+
+  /* Тулбары (поиск/фильтры) на мобильном — каждый элемент в свою строку на всю ширину,
+     а не непредсказуемый перенос flex-wrap на узком экране (см. .toolbar form input/select
+     выше, тот же корень проблемы). */
+  .toolbar,
+  .toolbar form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .toolbar form input,
+  .toolbar form select,
+  .toolbar form button {
+    flex: none;
+    width: 100%;
+  }
+
+  .page-back .btn {
+    width: 100%;
+  }
+
+  /* Комфортный размер тач-таргета (Apple/Material гайдлайны — от 44px) — на десктопе
+     компактные кнопки уместнее (много рядов в таблицах), а вот на телефоне промахиваться
+     пальцем мимо мелкой кнопки не должно быть в принципе. */
+  .btn,
+  .btn-sm,
+  input[type='text'],
+  input[type='password'],
+  input[type='number'],
+  input[type='date'],
+  select {
+    min-height: 44px;
+  }
+  .checkbox-row input[type='checkbox'] {
+    width: 22px;
+    height: 22px;
   }
 }

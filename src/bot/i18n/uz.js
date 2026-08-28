@@ -48,6 +48,7 @@ module.exports = {
 
   already_paid: "✅ Sizda kanalga kirish huquqi allaqachon bor. Agar havola yo'qolgan bo'lsa, u yana shu yerda:",
   blocked: "🚫 Sizning kirish huquqingiz administrator tomonidan bloklangan. Agar bu xato deb hisoblasangiz — qo'llab-quvvatlash xizmatiga murojaat qiling.",
+  account_deleted: "🚫 Sizning akkountingiz administrator tomonidan o'chirilgan. Agar bu xato deb hisoblasangiz — qo'llab-quvvatlash xizmatiga murojaat qiling.",
 
   access_granted: (inviteLink) =>
     `<b>To'lov tasdiqlandi!</b> 🎉\n\nQuyidagi havola orqali «So'rov yuborish» tugmasini bosing — so'rov avtomatik tasdiqlanadi:\n${inviteLink}`,

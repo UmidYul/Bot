@@ -15,6 +15,17 @@ function required(name, { allowEmptyInDev = false } = {}) {
   return value || '';
 }
 
+/** Как required(), но без сломанного allowEmptyInDev: в проде отсутствие переменной —
+ * всегда фатальная ошибка, в dev — devFallback. */
+function requireInProduction(name, devFallback) {
+  const value = process.env[name];
+  if (value) return value;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`Отсутствует обязательная переменная окружения: ${name}`);
+  }
+  return devFallback;
+}
+
 const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: process.env.NODE_ENV === 'production',
@@ -29,7 +40,15 @@ const config = {
   databaseUrl: required('DATABASE_URL', { allowEmptyInDev: true }) ||
     'postgres://postgres:admin@localhost:5432/tg_sub_bot',
 
-  sessionSecret: process.env.SESSION_SECRET || 'dev-local-secret-change-in-production',
+  // В проде отсутствие SESSION_SECRET — фатальная ошибка: без него куки сессии подписываются
+  // известным всем по исходникам на GitHub дефолтом, и это позволяет подделать чужую сессию
+  // администратора. Не используем required({allowEmptyInDev:true}) — у этого флага в helper'е
+  // выше есть баг: он отключает прод-проверку вообще, а не только смягчает её для dev
+  // (тот же баг уже был у BOT_TOKEN/DATABASE_URL, не трогаю это здесь отдельным патчем).
+  sessionSecret: requireInProduction('SESSION_SECRET', 'dev-only-insecure-secret-change-me'),
+
+  // Таймаут неактивности сессии админки — см. app.js (session({ rolling: true, cookie.maxAge })).
+  adminSessionMaxAgeHours: parseInt(process.env.ADMIN_SESSION_MAX_AGE_HOURS || '24', 10),
 
   click: {
     // Тумблер даём, чтобы можно было временно снять кнопку из бота (например, на время
@@ -86,12 +105,30 @@ const config = {
     lockoutMinutes: parseInt(process.env.PROMO_LOCKOUT_MINUTES || '15', 10),
   },
 
+  // Троттлинг уведомлений о недоплате (см. usersRepo.registerUnderpaymentNotice) — сама
+  // недоплата (зачисление на внутренний счёт) всегда проходит, ограничивается только поток
+  // сообщений юзеру/админу при частых мелких недоплатах подряд через один и тот же код.
+  underpaymentAntiSpam: {
+    maxAttempts: parseInt(process.env.UNDERPAYMENT_MAX_ATTEMPTS || '5', 10),
+    lockoutMinutes: parseInt(process.env.UNDERPAYMENT_LOCKOUT_MINUTES || '15', 10),
+  },
+
+  // Защита от подбора пароля админки — блокировка конкретного логина (admins.locked_until,
+  // см. adminsRepo) после N неверных паролей подряд.
+  adminLoginAntiSpam: {
+    maxAttempts: parseInt(process.env.ADMIN_LOGIN_MAX_ATTEMPTS || '5', 10),
+    lockoutMinutes: parseInt(process.env.ADMIN_LOGIN_LOCKOUT_MINUTES || '15', 10),
+  },
+
   backup: {
     // Путь к pg_dump — на Linux VPS обычно уже в PATH (пакет postgresql-client),
     // на Windows-деве нужно указать явно, см. .env.example.
     pgDumpPath: process.env.PG_DUMP_PATH || 'pg_dump',
     retentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS || '7', 10),
     dir: process.env.BACKUP_DIR || 'backups',
+    // Кому слать готовый .dump файлом в Telegram после каждого бэкапа — см. scripts/backup.js.
+    // Пусто = не отправлять, только сохранить локально.
+    telegramChatId: process.env.BACKUP_TELEGRAM_CHAT_ID || '',
   },
 };
 

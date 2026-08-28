@@ -67,10 +67,15 @@ function buildApp() {
       secret: config.sessionSecret,
       resave: false,
       saveUninitialized: false,
+      // rolling: true — maxAge отсчитывается заново при каждом запросе, то есть это таймаут
+      // БЕЗДЕЙСТВИЯ (ADMIN_SESSION_MAX_AGE_HOURS, по умолчанию 24ч), а не жёсткий разлогин
+      // через 24ч даже у активно работающего админа.
+      rolling: true,
       cookie: {
         httpOnly: true,
         secure: config.isProduction,
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 дней
+        sameSite: 'lax',
+        maxAge: 1000 * 60 * 60 * config.adminSessionMaxAgeHours,
       },
     })
   );

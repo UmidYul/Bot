@@ -15,6 +15,7 @@ module.exports = {
   login_field_password: 'Пароль',
   login_submit: 'Войти',
   login_error: 'Неверный логин или пароль',
+  login_locked: 'Слишком много неверных попыток входа. Попробуйте снова позже.',
 
   users_title: 'Пользователи',
   users_search_placeholder: 'Код / телефон / username',
@@ -53,6 +54,7 @@ module.exports = {
   btn_delete: 'Удалить',
   btn_restore: 'Восстановить',
   confirm_delete: 'Удалить пользователя? Это скроет его из списка — платежи и логи сохранятся.',
+  confirm_status_change: (value) => `Сменить статус на «${value}»? Это ручное вмешательство в жизненный цикл оплаты.`,
 
   section_status_override: 'Статус вручную',
   status_override_hint: 'Выдать доступ без реального платежа (запишется в историю платежей) или сбросить статус.',

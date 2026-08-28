@@ -11,6 +11,7 @@
 
 <div class="card" style="max-width:760px;margin:0 auto">
   <form method="POST" action="/admin/settings">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
     <div class="card-section">
       <div class="card-section-title"><%= t('settings_section_channel') %></div>
 

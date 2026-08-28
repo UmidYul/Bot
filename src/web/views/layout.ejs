@@ -27,7 +27,10 @@
           <a href="/admin/lang/uz" class="<%= lang === 'uz' ? 'active' : '' %>">UZ</a>
         </div>
         <span class="admin-name"><%= admin.login %></span>
-        <a href="/admin/logout" class="logout-link"><%= t('logout') %></a>
+        <form method="POST" action="/admin/logout" style="display:inline">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+          <button type="submit" class="logout-link"><%= t('logout') %></button>
+        </form>
       </div>
     </div>
   </div>

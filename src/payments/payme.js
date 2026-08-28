@@ -5,8 +5,14 @@ const promoCodesRepo = require('../db/repositories/promoCodes');
 const { grantAccess } = require('../services/accessService');
 const { sendReceipt } = require('../services/receiptService');
 const { sendUnderpaymentNotice } = require('../services/underpaymentNotice');
-const { notifyNewPayment, notifyUnderpayment } = require('../services/adminNotifyService');
+const {
+  notifyNewPayment,
+  notifyUnderpayment,
+  notifyUnderpaymentLockout,
+  notifyPostPaymentFailure,
+} = require('../services/adminNotifyService');
 const { resolvePaymentOutcome } = require('../services/balanceService');
+const { resolveTargetPrice } = require('../services/promoService');
 
 // Стандартные коды ошибок Payme Merchant API.
 const ERROR = {
@@ -69,7 +75,7 @@ async function resolveAccount(account) {
   }
 
   const user = await usersRepo.findByCode(merchantTransId);
-  if (!user || user.blocked_at || user.status === 'paid') return null;
+  if (!user || user.deleted_at || user.blocked_at || user.status === 'paid') return null;
 
   return { merchantTransId, payment: null, user };
 }
@@ -77,14 +83,14 @@ async function resolveAccount(account) {
 /**
  * Защита от повторной реальной оплаты: юзер мог оставить эту оплату "висеть" (не закрыл
  * страницу Payme), а доступ уже получить другим способом (Click, промокод, второй платёж) —
- * или его успели заблокировать, пока платёж был в pending. Проверяем ДО списания денег
+ * или его успели заблокировать/удалить, пока платёж был в pending. Проверяем ДО списания денег
  * (CheckPerformTransaction/CreateTransaction), чтобы не доводить до реального списания —
  * в PerformTransaction эту проверку намеренно не дублируем: к этому моменту Payme уже мог
  * списать/захолдировать средства, и отказ здесь означал бы повисшие деньги без доступа.
  */
 async function assertUserStillPayable(userId) {
   const user = await usersRepo.findById(userId);
-  if (!user || user.blocked_at || user.status === 'paid') {
+  if (!user || user.deleted_at || user.blocked_at || user.status === 'paid') {
     throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
   }
 }
@@ -117,9 +123,14 @@ async function checkPerformTransaction(params) {
 
   await logEvent(resolved.payment ? resolved.payment.id : null, 'CheckPerformTransaction', params);
 
-  // Сумма больше не сверяется здесь: пользователь мог платить меньше цены канала напрямую
-  // через приложение — недоплата зачисляется на внутренний счёт (см. balanceService.js),
-  // доступ выдаётся, когда накопленный счёт + платёж достигают config.channelPrice.
+  // Точное совпадение суммы больше не требуется: пользователь мог платить меньше цены канала
+  // напрямую через приложение — недоплата зачисляется на внутренний счёт (см.
+  // balanceService.js), доступ выдаётся, когда накопленный счёт + платёж достигают
+  // config.channelPrice. Но сумма всё ещё должна быть реальными деньгами.
+  if (!(Number(params.amount) > 0)) {
+    throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
+  }
+
   if (resolved.payment) {
     if (resolved.payment.status !== 'pending') {
       throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
@@ -136,6 +147,11 @@ async function createTransaction(params) {
   if (!payment) {
     const resolved = await resolveAccount(params.account);
     if (!resolved) throw rpcError(ERROR.INVALID_ACCOUNT, 'Order not found', { account: ['merchant_trans_id'] });
+    if (!resolved.payment && !(Number(params.amount) > 0)) {
+      // Заводить on-the-fly заказ на ноль/отрицательную "сумму" нельзя — это навсегда занять
+      // merchant_trans_id этого кода нулевой транзакцией (см. handlePrepare в click.js).
+      throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
+    }
 
     // Платёж по коду ещё не заведён в БД — юзер платит вручную через приложение Payme,
     // минуя бота. Заводим его на лету суммой, которую реально прислал Payme (может быть
@@ -196,6 +212,9 @@ async function performTransaction(params) {
   if (payment.status !== 'pending') {
     throw rpcError(ERROR.UNABLE_TO_PERFORM, 'Order is not payable');
   }
+  if (!(Number(params.amount) > 0)) {
+    throw rpcError(ERROR.INVALID_AMOUNT, 'Incorrect amount');
+  }
 
   const paidAt = new Date();
   const paidAmount = tiyinToUzs(params.amount);
@@ -203,20 +222,45 @@ async function performTransaction(params) {
   // доступ" — см. комментарий в paymentsRepo.markPaid и resolvePaymentOutcome ниже.
   const updated = await paymentsRepo.markPaid(payment.id, { paidAt, amount: paidAmount });
 
-  const user = await usersRepo.findById(payment.user_id);
-  const outcome = resolvePaymentOutcome(user.balance, paidAmount, config.channelPrice);
+  // С этой точки деньги уже списаны и payment.status='paid' уже закоммичен в Postgres — что бы
+  // ни случилось ниже, Payme должен получить успешный ответ. Иначе он сочтёт PerformTransaction
+  // неуспешным и повторит запрос — а повторный вызов сразу попадёт в идемпотентную ветку выше
+  // (payment.status === 'paid') и вернёт успех, ни разу не выполнив то, что упало здесь: баланс
+  // не зачислится, доступ не выдастся, уведомления не уйдут, и НИКАКОЙ последующий ретрай это
+  // уже не исправит. Поэтому, как и в click.js handleComplete, всё это оборачивается в try/catch
+  // с логированием, а не даёт исключению всплыть наружу в handleRpc.
+  try {
+    // Атомарный инкремент вместо read-modify-write — см. аналогичный комментарий в click.js
+    // handleComplete: два почти одновременных платежа не должны оба решить "не хватает" по
+    // балансу, прочитанному до увеличения друг другом.
+    const updatedUser = await usersRepo.incrementBalance(payment.user_id, paidAmount);
+    const targetPrice = await resolveTargetPrice(config.channelPrice, updated.promo_code_id);
+    const outcome = resolvePaymentOutcome(updatedUser.balance, 0, targetPrice);
 
-  if (outcome.grantsAccess) {
-    if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
-    await usersRepo.setBalance(user.id, 0);
-    const updatedUser = await usersRepo.updateStatus(payment.user_id, 'paid');
-    await grantAccess(updatedUser);
-    await sendReceipt(updatedUser, updated);
-    await notifyNewPayment(updatedUser, updated);
-  } else {
-    const updatedUser = await usersRepo.incrementBalance(user.id, paidAmount);
-    await sendUnderpaymentNotice(updatedUser, { paidNow: paidAmount, remaining: outcome.remaining });
-    await notifyUnderpayment(updatedUser, updated, outcome.remaining);
+    if (outcome.grantsAccess) {
+      if (updated.promo_code_id) await promoCodesRepo.incrementUsage(updated.promo_code_id);
+      await usersRepo.setBalance(updatedUser.id, 0);
+      const paidUser = await usersRepo.updateStatus(payment.user_id, 'paid');
+      await grantAccess(paidUser);
+      await sendReceipt(paidUser, updated);
+      await notifyNewPayment(paidUser, updated);
+    } else if (updatedUser.status !== 'paid') {
+      // Доступ уже выдан другим почти одновременным платежом — см. комментарий в click.js.
+      // Анти-спам недоплат — см. комментарий в click.js handleComplete.
+      const throttle = await usersRepo.registerUnderpaymentNotice(
+        updatedUser.id,
+        config.underpaymentAntiSpam.maxAttempts,
+        config.underpaymentAntiSpam.lockoutMinutes
+      );
+      if (throttle.shouldNotify) {
+        await sendUnderpaymentNotice(updatedUser, { paidNow: paidAmount, remaining: outcome.remaining });
+        await notifyUnderpayment(updatedUser, updated, outcome.remaining);
+        if (throttle.justLocked) await notifyUnderpaymentLockout(updatedUser);
+      }
+    }
+  } catch (err) {
+    console.error('[payme] PerformTransaction post-payment step failed (payment is already marked paid in DB):', err);
+    await notifyPostPaymentFailure('Payme', payment.id, err);
   }
 
   return {

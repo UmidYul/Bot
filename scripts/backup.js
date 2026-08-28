@@ -57,6 +57,57 @@ function runDump(dbUrl, outFile) {
   });
 }
 
+// Лимит Telegram Bot API на файлы, загружаемые ботом напрямую (без локального Bot API
+// сервера) — 50 МБ. Если дамп больше, просто предупреждаем и не пытаемся отправить —
+// сам бэкап на диске от этого никак не страдает.
+const TELEGRAM_MAX_FILE_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Шлёт готовый .dump файлом в Telegram (см. config.backup.telegramChatId) через голый
+ * Bot API (fetch/FormData/Blob — все встроены в Node, без node-fetch/telegraf), а не через
+ * живой bot-инстанс из src/bot — этот скрипт может запускаться из cron независимо от
+ * основного процесса, поднимать полноценный Telegraf с вебхуком здесь ни к чему.
+ * Best-effort: падение отправки не должно превращать успешный бэкап в "неудачный" —
+ * файл уже благополучно лежит на диске, это просто уведомление.
+ */
+async function sendToTelegram(filePath, caption) {
+  const chatId = config.backup.telegramChatId;
+  if (!chatId) return;
+
+  if (!config.botToken) {
+    console.warn('BACKUP_TELEGRAM_CHAT_ID задан, но BOT_TOKEN пуст — отправка бэкапа в Telegram пропущена.');
+    return;
+  }
+
+  const size = fs.statSync(filePath).size;
+  if (size > TELEGRAM_MAX_FILE_BYTES) {
+    console.warn(
+      `Бэкап ${(size / 1024 / 1024).toFixed(1)} МБ превышает лимит Telegram на загрузку ботом (50 МБ) — файл не отправлен, только сохранён локально.`
+    );
+    return;
+  }
+
+  try {
+    const form = new FormData();
+    form.append('chat_id', chatId);
+    form.append('caption', caption);
+    form.append('document', new Blob([fs.readFileSync(filePath)]), path.basename(filePath));
+
+    const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendDocument`, {
+      method: 'POST',
+      body: form,
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      throw new Error(`Telegram API: ${data.description || res.status}`);
+    }
+    console.log(`Бэкап отправлен в Telegram (chat_id=${chatId}).`);
+  } catch (err) {
+    console.error('Не удалось отправить бэкап в Telegram:', err.message);
+  }
+}
+
 function cleanupOldBackups(dir, retentionDays) {
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   const removed = [];
@@ -85,6 +136,8 @@ async function main() {
 
   const sizeKb = (fs.statSync(outFile).size / 1024).toFixed(1);
   console.log(`Готово, ${sizeKb} KB`);
+
+  await sendToTelegram(outFile, `🗄 Бэкап БД\n${path.basename(outFile)}\n${sizeKb} KB`);
 
   const removed = cleanupOldBackups(dir, config.backup.retentionDays);
   if (removed.length) {

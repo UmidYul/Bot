@@ -38,7 +38,7 @@ function resetPaymentSession(ctx, user) {
  */
 async function guardActionable(ctx, user) {
   if (!user) return false;
-  if (user.blocked_at || user.status === 'paid') {
+  if (user.deleted_at || user.blocked_at || user.status === 'paid') {
     if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
     await routeExistingUser(ctx, user);
     return false;

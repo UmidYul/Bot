@@ -1,4 +1,4 @@
-<p><a href="/admin/users"><%= t('user_detail_back') %></a></p>
+<div class="page-back"><a href="/admin/users" class="btn btn-sm"><%= t('user_detail_back') %></a></div>
 <h1><%= t('user_detail_title', user.code) %></h1>
 
 <% if (flash) { %>
@@ -38,20 +38,24 @@
     <div class="actions" style="margin-top:20px">
       <% if (user.blocked_at) { %>
         <form method="POST" action="/admin/users/<%= user.id %>/unblock">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <button type="submit" class="btn btn-primary"><%= t('btn_unblock') %></button>
         </form>
       <% } else { %>
         <form method="POST" action="/admin/users/<%= user.id %>/block" data-confirm="<%= t('confirm_block') %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <button type="submit" class="btn btn-danger"><%= t('btn_block') %></button>
         </form>
       <% } %>
 
       <% if (user.deleted_at) { %>
         <form method="POST" action="/admin/users/<%= user.id %>/restore">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <button type="submit" class="btn btn-primary"><%= t('btn_restore') %></button>
         </form>
       <% } else { %>
         <form method="POST" action="/admin/users/<%= user.id %>/delete" data-confirm="<%= t('confirm_delete') %>">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <button type="submit" class="btn btn-danger"><%= t('btn_delete') %></button>
         </form>
       <% } %>
@@ -62,6 +66,7 @@
     <div class="card-section-title" style="margin-bottom:12px"><%= t('section_status_override') %></div>
     <p class="field-hint" style="margin-top:0"><%= t('status_override_hint') %></p>
     <form method="POST" action="/admin/users/<%= user.id %>/status" class="status-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
       <select name="status">
         <% ['new','pending','paid'].forEach(function (s) { %>
           <option value="<%= s %>" <%= user.status === s ? 'selected' : '' %>><%= t('status_' + s) %></option>
@@ -96,6 +101,7 @@
             <td data-label="<%= t('payments_col_promo') %>"><%= p.promo_code || '—' %></td>
             <td data-label="<%= t('payments_col_change_status') %>">
               <form method="POST" action="/admin/payments/<%= p.id %>/status" class="status-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
                 <select name="status">
                   <% ['pending','paid','failed'].forEach(function (s) { %>
                     <option value="<%= s %>" <%= p.status === s ? 'selected' : '' %>><%= s %></option>
@@ -156,6 +162,30 @@
         btn.classList.add('active');
         var target = document.querySelector('.tab-panel[data-panel="' + btn.dataset.tab + '"]');
         if (target) target.hidden = false;
+      });
+    });
+  })();
+
+  (function () {
+    // Обе формы смены статуса (юзера и конкретного платежа) — обход автоматической логики
+    // оплаты/баланса вручную, стоит переспросить перед отправкой. Текст подтверждения строим
+    // динамически по выбранному в <select> значению, а не статичным data-confirm, как у
+    // block/delete — здесь важно показать, на какой именно статус меняем.
+    var template = <%- JSON.stringify(t('confirm_status_change', '__VALUE__')) %>;
+    Array.prototype.slice.call(document.querySelectorAll('.status-form')).forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.confirmed) return;
+        e.preventDefault();
+
+        var select = form.querySelector('select[name="status"]');
+        var label = select.options[select.selectedIndex].text;
+        var message = template.replace('__VALUE__', label);
+
+        window.AdminConfirm.open(message, function () {
+          form.dataset.confirmed = '1';
+          if (form.requestSubmit) form.requestSubmit();
+          else form.submit();
+        });
       });
     });
   })();
