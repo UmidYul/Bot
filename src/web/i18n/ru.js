@@ -154,6 +154,18 @@ module.exports = {
   settings_field_admin_notify_chat_ids_hint: 'Узнать свой id можно у @userinfobot. Пусто — уведомления не отправляются.',
   settings_save: 'Сохранить настройки',
 
+  account_section_title: 'Мой аккаунт',
+  account_field_new_password: 'Новый пароль',
+  account_field_new_password_hint: 'Оставьте пустым, чтобы не менять пароль',
+  account_field_new_password_confirm: 'Повторите новый пароль',
+  account_field_current_password: 'Текущий пароль',
+  account_field_current_password_hint: 'Нужен для подтверждения изменений',
+  account_error_wrong_password: 'Неверный текущий пароль',
+  account_error_login_empty: 'Логин не может быть пустым',
+  account_error_login_taken: 'Этот логин уже занят',
+  account_error_password_short: 'Новый пароль должен быть не короче 8 символов',
+  account_error_password_mismatch: 'Пароли не совпадают',
+
   status_new: 'новый',
   status_pending: 'ожидает оплаты',
   status_paid: 'оплачен',
@@ -170,6 +182,7 @@ module.exports = {
   flash_promo_activated: 'Промокод включён',
   flash_promo_deactivated: 'Промокод отключён',
   flash_settings_saved: 'Настройки сохранены',
+  flash_account_updated: 'Данные аккаунта обновлены',
   flash_broadcast_started: 'Рассылка запущена — итог придёт уведомлением в бот администраторам',
 
   error_user_not_found: 'Пользователь не найден',

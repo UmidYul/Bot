@@ -46,4 +46,14 @@ function resetFailedLogins(id) {
   return db('admins').where({ id }).update({ failed_login_attempts: 0, locked_until: null });
 }
 
-module.exports = { findByLogin, findById, create, listAll, recordFailedLogin, resetFailedLogins };
+/**
+ * Смена логина/пароля самим админом (см. web/routes/admin.js POST /account). passwordHash
+ * необязателен — если не передан, пароль не трогаем (юзер оставил поле "новый пароль" пустым).
+ */
+function updateCredentials(id, { login, passwordHash }) {
+  const update = { login };
+  if (passwordHash) update.password_hash = passwordHash;
+  return db('admins').where({ id }).update(update).returning('*').then((rows) => rows[0]);
+}
+
+module.exports = { findByLogin, findById, create, listAll, recordFailedLogin, resetFailedLogins, updateCredentials };

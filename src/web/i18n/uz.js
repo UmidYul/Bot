@@ -154,6 +154,18 @@ module.exports = {
   settings_field_admin_notify_chat_ids_hint: "O'z id'ingizni @userinfobot orqali bilib olishingiz mumkin. Bo'sh — bildirishnomalar yuborilmaydi.",
   settings_save: 'Sozlamalarni saqlash',
 
+  account_section_title: 'Mening hisobim',
+  account_field_new_password: 'Yangi parol',
+  account_field_new_password_hint: "Parolni o'zgartirmaslik uchun bo'sh qoldiring",
+  account_field_new_password_confirm: "Yangi parolni takrorlang",
+  account_field_current_password: 'Joriy parol',
+  account_field_current_password_hint: "O'zgarishlarni tasdiqlash uchun kerak",
+  account_error_wrong_password: "Joriy parol noto'g'ri",
+  account_error_login_empty: "Login bo'sh bo'lishi mumkin emas",
+  account_error_login_taken: 'Bu login band',
+  account_error_password_short: "Yangi parol kamida 8 ta belgidan iborat bo'lishi kerak",
+  account_error_password_mismatch: 'Parollar mos kelmadi',
+
   status_new: 'yangi',
   status_pending: "to'lov kutilmoqda",
   status_paid: "to'langan",
@@ -170,6 +182,7 @@ module.exports = {
   flash_promo_activated: 'Promokod yoqildi',
   flash_promo_deactivated: "Promokod o'chirildi",
   flash_settings_saved: 'Sozlamalar saqlandi',
+  flash_account_updated: "Hisob ma'lumotlari yangilandi",
   flash_broadcast_started: "Xabar yuborish boshlandi — natija botda adminlarga xabar sifatida keladi",
 
   error_user_not_found: 'Foydalanuvchi topilmadi',

@@ -546,7 +546,9 @@ router.get('/settings', (req, res) => {
     title: res.locals.t('settings_title'),
     active: 'settings',
     values: settingsService.getCurrent(),
+    accountValues: { login: res.locals.admin.login },
     error: null,
+    accountError: null,
     flash: req.query.flash ? res.locals.t(`flash_${req.query.flash}`) : null,
   });
 });
@@ -563,10 +565,66 @@ router.post(
         title: res.locals.t('settings_title'),
         active: 'settings',
         values: { ...settingsService.getCurrent(), ...req.body },
+        accountValues: { login: res.locals.admin.login },
         error: err.message,
+        accountError: null,
         flash: null,
       });
     }
+  })
+);
+
+// --- Мой аккаунт (логин/пароль самого админа) ---
+
+router.post(
+  '/account',
+  asyncHandler(async (req, res) => {
+    const admin = await adminsRepo.findById(req.session.adminId);
+    const { current_password, login, password, password_confirm } = req.body;
+    const newLogin = (login || '').trim();
+
+    const renderError = (accountError) =>
+      res.render('settings', {
+        title: res.locals.t('settings_title'),
+        active: 'settings',
+        values: settingsService.getCurrent(),
+        accountValues: { login: newLogin || admin.login },
+        error: null,
+        accountError,
+        flash: null,
+      });
+
+    // Смена логина/пароля требует текущий пароль — иначе угнанная сессия админа (например,
+    // оставленный открытым браузер) позволила бы захватить аккаунт навсегда, просто сменив
+    // логин/пароль без дополнительного подтверждения.
+    if (!(await bcrypt.compare(current_password || '', admin.password_hash))) {
+      return renderError(res.locals.t('account_error_wrong_password'));
+    }
+    if (!newLogin) {
+      return renderError(res.locals.t('account_error_login_empty'));
+    }
+    if (newLogin !== admin.login) {
+      const existing = await adminsRepo.findByLogin(newLogin);
+      if (existing) return renderError(res.locals.t('account_error_login_taken'));
+    }
+
+    let passwordHash;
+    if (password) {
+      if (password.length < 8) return renderError(res.locals.t('account_error_password_short'));
+      if (password !== password_confirm) return renderError(res.locals.t('account_error_password_mismatch'));
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    await adminsRepo.updateCredentials(admin.id, { login: newLogin, passwordHash });
+    await logAdminAction(req, {
+      action: 'admin_credentials_change',
+      meta: { from_login: admin.login, to_login: newLogin, password_changed: Boolean(passwordHash) },
+    });
+
+    // Логин в сессии обновляем сразу — иначе шапка/аудит-лог показывали бы старый логин до
+    // следующего входа, хотя в БД он уже сменился.
+    req.session.adminLogin = newLogin;
+    res.redirect(flashUrl('/admin/settings', 'account_updated'));
   })
 );
 

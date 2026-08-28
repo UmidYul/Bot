@@ -89,3 +89,39 @@
     </div>
   </form>
 </div>
+
+<div class="card" style="max-width:760px;margin:24px auto 0">
+  <div class="card-section-title" style="margin-bottom:12px"><%= t('account_section_title') %></div>
+  <% if (accountError) { %>
+    <div class="flash flash-error"><%= accountError %></div>
+  <% } %>
+  <form method="POST" action="/admin/account">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+
+    <div class="field">
+      <label for="account_login"><%= t('login_field_login') %></label>
+      <input type="text" id="account_login" name="login" value="<%= accountValues.login %>" required />
+    </div>
+
+    <div class="field">
+      <label for="account_password"><%= t('account_field_new_password') %></label>
+      <input type="password" id="account_password" name="password" autocomplete="new-password" />
+      <div class="field-hint"><%= t('account_field_new_password_hint') %></div>
+    </div>
+
+    <div class="field">
+      <label for="account_password_confirm"><%= t('account_field_new_password_confirm') %></label>
+      <input type="password" id="account_password_confirm" name="password_confirm" autocomplete="new-password" />
+    </div>
+
+    <div class="field">
+      <label for="account_current_password"><%= t('account_field_current_password') %></label>
+      <input type="password" id="account_current_password" name="current_password" autocomplete="current-password" required />
+      <div class="field-hint"><%= t('account_field_current_password_hint') %></div>
+    </div>
+
+    <div style="margin-top:24px">
+      <button type="submit" class="btn btn-primary"><%= t('btn_save') %></button>
+    </div>
+  </form>
+</div>
