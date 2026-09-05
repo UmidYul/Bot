@@ -16,7 +16,7 @@ const {
   cancelPaymentKeyboard,
   paymentLinkKeyboard,
 } = require('../keyboards');
-const { showPaymentScreen, routeExistingUser } = require('./start');
+const { showPaymentScreen, routeExistingUser, handleStart } = require('./start');
 
 /**
  * Сумма к оплате уменьшается на уже накопленный внутренний счёт (недоплата через Click/Payme,
@@ -37,7 +37,13 @@ function resetPaymentSession(ctx, user) {
  * если апдейт реально callback_query — иначе telegraf бросает синхронную ошибку.
  */
 async function guardActionable(ctx, user) {
-  if (!user) return false;
+  // Юзера нет в БД (например, его жёстко удалили), а кнопки и меню в его чате остались —
+  // молча ничего не делать нельзя, отправляем на регистрацию заново.
+  if (!user) {
+    if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
+    await handleStart(ctx);
+    return false;
+  }
   if (user.deleted_at || user.blocked_at || user.status === 'paid') {
     if (ctx.callbackQuery) await ctx.answerCbQuery().catch(() => {});
     await routeExistingUser(ctx, user);
@@ -60,6 +66,12 @@ async function showPaymentMethodScreen(ctx, user, prefix = '') {
 async function handleEnterPromo(ctx) {
   const user = ctx.state.user;
   if (!(await guardActionable(ctx, user))) return;
+
+  // Кнопка меню (reply-keyboard) — это обычное сообщение, а не callback: экран нужно
+  // показать НОВЫМ сообщением внизу чата. Иначе showScreen молча отредактирует
+  // запомненный screenMessageId где-то выше по истории, и юзеру кажется, что бот молчит
+  // (у кнопки "To'lov" этой проблемы нет — openPaymentScreen сбрасывает id сам).
+  if (!ctx.callbackQuery) ctx.session.screenMessageId = null;
 
   ctx.session.awaitingPromo = true;
   if (ctx.callbackQuery) await ctx.answerCbQuery();
