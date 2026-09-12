@@ -78,16 +78,27 @@ the same reason — it always reflects the current toggle state.
   must have Prepare/Complete URLs configured to `<WEB_BASE_URL>/payments/click`**, or the
   webhook is never called at all (this is external config, not fixable from code).
 - **Payme** (`src/payments/payme.js`): JSON-RPC 2.0 over `POST /payments/payme`, Basic-auth
-  checked against `PAYME_SECRET_KEY` (prod) or `PAYME_TEST_KEY` (sandbox). Currently gated
-  behind `PAYME_ENABLED` (button hidden, webhook stays live) — see `settingsService`.
+  checked against `PAYME_SECRET_KEY` (prod) or `PAYME_TEST_KEY` (sandbox) — only against
+  **non-empty** keys, split on the **first** colon (Payme keys may contain colons), compared
+  with `crypto.timingSafeEqual`. Currently gated behind `PAYME_ENABLED` (button hidden,
+  webhook stays live) — see `settingsService`. The route always answers HTTP 200 with a valid
+  JSON-RPC body: Payme reads any other status, any invalid body, and any `-32xxx` (including
+  `-32504` auth failures) as "провайдер работает некорректно", so auth outcome, method and
+  final response are logged to `logs/webhooks.log` (never the key itself — only scheme, login
+  and length).
 - Both webhooks handle a **"pay like a utility bill" cold-start path**: a user can open the
   Click/Payme app directly, skip the bot entirely, and enter their `users.code` (shown in
   `/profile`) as the account/transaction id. `resolveOrCreatePayment` (Click) /
-  `resolveAccount`+`createTransaction` (Payme) look up an existing payment by
-  `merchant_trans_id` first, and if none exists, look up the user by `code` and create the
-  payment on the fly **at the current `config.channelPrice`**, never at whatever amount the
-  provider payload claims — the amount from the provider is only used for the matching check
-  (`amountsMatch`), never trusted as the charge amount.
+  `resolveAccount`+`createTransaction` (Payme) look up a **`pending` payment of their own
+  provider** by `merchant_trans_id` first, and if none exists, look up the user by `code` and
+  create the payment on the fly. The lookup must stay provider-scoped: the same `users.code`
+  is the account number for every provider, so a global "first row wins" lookup let whichever
+  provider created the row first own that code forever (`-31050` for Payme, `-5` for Click).
+  For the same reason `payments.merchant_trans_id` is no longer globally `UNIQUE` (migration
+  `...0017`) — the invariant is now a partial unique index on
+  `(provider, merchant_trans_id) WHERE status = 'pending'`, and
+  `paymentsRepo.createOrGetPendingPayment` turns a lost race on it (SQLSTATE 23505) into
+  "return the row the other request just created".
 - Amounts: Click and the `payments` table are in UZS (sums); Payme is in tiyin (×100) — see
   `amountsMatch` in `payme.js`.
 - Idempotency: both webhooks are written so a duplicate Prepare/Complete/Perform (retries are
