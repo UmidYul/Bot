@@ -97,23 +97,30 @@ async function logEvent(paymentId, event, payload) {
  * доступ выдаётся только когда накопленный счёт + этот платёж достигают config.channelPrice.
  */
 async function resolveOrCreatePayment(merchantTransId, amount) {
-  const existing = await paymentsRepo.findByMerchantTransId(merchantTransId);
-  if (existing) {
-    // merchant_trans_id мог по крайне маловероятному совпадению принадлежать платежу,
-    // заведённому под другого провайдера (Payme/промокод) — не отдаём его чужому вебхуку.
-    return existing.provider === 'click' ? existing : null;
-  }
+  // Ищем именно живой (pending) платёж ПРОВАЙДЕРА click: один и тот же код юзера служит
+  // лицевым счётом и в Click, и в Payme, поэтому строк с таким merchant_trans_id может быть
+  // несколько. Раньше бралась первая попавшаяся, и строка, заведённая Payme, навсегда
+  // занимала код для Click (вечный -5 "Order not found").
+  const existing = await paymentsRepo.findPendingByProviderAndMerchantTransId('click', merchantTransId);
+  if (existing) return existing;
 
   const user = await usersRepo.findByCode(merchantTransId);
-  if (!user || user.deleted_at || user.blocked_at || user.status === 'paid') return null;
+  if (user) {
+    if (user.deleted_at || user.blocked_at || user.status === 'paid') return null;
+    // createOrGetPendingPayment, а не createPayment: два почти одновременных Prepare по
+    // одному коду не должны падать на уникальном индексе — второй подхватит строку первого.
+    return paymentsRepo.createOrGetPendingPayment({
+      userId: user.id,
+      provider: 'click',
+      amount,
+      merchantTransId,
+    });
+  }
 
-  return paymentsRepo.createPayment({
-    userId: user.id,
-    provider: 'click',
-    amount,
-    merchantTransId,
-    status: 'pending',
-  });
+  // merchant_trans_id — не код юзера, а конкретный заказ из бота ("<code>-<ts>"), живого
+  // платежа по нему нет: он уже оплачен или отменён. Возвращаем последнюю строку, чтобы
+  // handlePrepare ответил -4/-9 (как и раньше), а не -5 "Order not found".
+  return paymentsRepo.findLatestByProviderAndMerchantTransId('click', merchantTransId);
 }
 
 /**
@@ -221,7 +228,15 @@ async function handleComplete(payload) {
     return { error: ERROR.SIGN_CHECK_FAILED, error_note: 'SIGN CHECK FAILED' };
   }
 
-  const payment = await paymentsRepo.findByMerchantTransId(payload.merchant_trans_id);
+  // Prepare уже привязал click_trans_id к конкретной строке — ищем сначала по нему: с тех
+  // пор как merchant_trans_id (код юзера при оплате "как за коммуналку") может встречаться
+  // в нескольких строках, поиск только по нему неоднозначен. Фолбэк по merchant_trans_id
+  // оставлен для Complete без предшествующего Prepare — его отсечёт проверка ниже (-6).
+  const boundToTransId = await paymentsRepo.findByProviderTransId(String(payload.click_trans_id));
+  const payment =
+    boundToTransId && boundToTransId.provider === 'click'
+      ? boundToTransId
+      : await paymentsRepo.findLatestByProviderAndMerchantTransId('click', payload.merchant_trans_id);
   log('COMPLETE payment lookup', {
     merchant_trans_id: payload.merchant_trans_id,
     found: Boolean(payment),
