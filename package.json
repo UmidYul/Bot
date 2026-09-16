@@ -14,7 +14,7 @@
     "migrate:rollback": "knex --knexfile src/db/knexfile.js migrate:rollback",
     "seed": "knex --knexfile src/db/knexfile.js seed:run",
     "backup": "node scripts/backup.js",
-    "test": "node --test src/**/*.test.js"
+    "test": "node --test \"src/**/*.test.js\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
