@@ -16,6 +16,7 @@ module.exports = {
   login_submit: 'Kirish',
   login_error: "Login yoki parol noto'g'ri",
   login_locked: "Juda ko'p noto'g'ri urinish. Birozdan so'ng qayta urinib ko'ring.",
+  csrf_error: "Sessiya eskirgan — sahifani yangilang va qaytadan urinib ko'ring.",
 
   users_title: 'Foydalanuvchilar',
   users_search_placeholder: 'Kod / telefon / username',
