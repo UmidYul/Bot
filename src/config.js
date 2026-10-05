@@ -50,6 +50,23 @@ const config = {
   // Таймаут неактивности сессии админки — см. app.js (session({ rolling: true, cookie.maxAge })).
   adminSessionMaxAgeHours: parseInt(process.env.ADMIN_SESSION_MAX_AGE_HOURS || '24', 10),
 
+  // Приложение почти всегда стоит ЗА reverse proxy (Nginx, cPanel/Passenger), который
+  // терминирует HTTPS и ходит в Node по обычному http. Без 'trust proxy' Express считает
+  // такое соединение незащищённым (req.secure === false), а express-session при
+  // cookie.secure=true в этом случае ВООБЩЕ не отдаёт Set-Cookie — браузер остаётся без
+  // куки сессии, на каждый запрос создаётся новая сессия, и вход в админку падает с
+  // "Invalid CSRF token": токен в форме был выписан в одной сессии, а проверяется уже
+  // в другой. Значение — как у Express: число доверенных хопов прокси (по умолчанию 1),
+  // 'false'/'0' — выключить (если Node смотрит в интернет напрямую), либо список
+  // IP/подсетей строкой.
+  trustProxy: (() => {
+    const raw = (process.env.TRUST_PROXY || '').trim();
+    if (!raw) return 1;
+    if (raw === 'false' || raw === '0') return false;
+    if (raw === 'true') return true;
+    return /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+  })(),
+
   click: {
     // Тумблер даём, чтобы можно было временно снять кнопку из бота (например, на время
     // проблем у провайдера), не трогая код.
@@ -149,5 +166,11 @@ Object.defineProperty(config, 'enabledPaymentProviders', {
 // его не достать снаружи, поэтому в деве бот сам переключается на long-polling — вручную
 // поднимать ngrok/etc не нужно. В проде (реальный https-домен в WEB_BASE_URL) всегда webhook.
 config.usePolling = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(config.webBaseUrl);
+
+// Secure-куки имеют смысл только если наружу мы действительно доступны по HTTPS. Если в
+// проде WEB_BASE_URL — обычный http (или домена ещё нет), cookie.secure=true молча ломает
+// авторизацию целиком (см. комментарий к trustProxy выше), поэтому включаем его только для
+// https-домена.
+config.useSecureCookies = config.isProduction && /^https:\/\//i.test(config.webBaseUrl);
 
 module.exports = config;

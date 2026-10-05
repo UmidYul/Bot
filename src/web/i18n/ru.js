@@ -16,6 +16,7 @@ module.exports = {
   login_submit: 'Войти',
   login_error: 'Неверный логин или пароль',
   login_locked: 'Слишком много неверных попыток входа. Попробуйте снова позже.',
+  csrf_error: 'Сессия устарела — обновите страницу и попробуйте снова.',
 
   users_title: 'Пользователи',
   users_search_placeholder: 'Код / телефон / username',

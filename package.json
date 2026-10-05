@@ -14,10 +14,14 @@
     "migrate:rollback": "knex --knexfile src/db/knexfile.js migrate:rollback",
     "seed": "knex --knexfile src/db/knexfile.js seed:run",
     "backup": "node scripts/backup.js",
+<<<<<<< HEAD
     "backup:create": "node scripts/backup-restore.js backup",
 "backup:list": "node scripts/backup-restore.js list",
 "backup:restore": "node scripts/backup-restore.js restore",
     "test": "node --test src/**/*.test.js"
+=======
+    "test": "node --test \"src/**/*.test.js\""
+>>>>>>> e385a2b29fc255175253343f6c7007990a4ac009
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

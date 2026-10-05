@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const config = require('../config');
 const paymentsRepo = require('../db/repositories/payments');
 const usersRepo = require('../db/repositories/users');
@@ -13,6 +14,7 @@ const {
 } = require('../services/adminNotifyService');
 const { resolvePaymentOutcome } = require('../services/balanceService');
 const { resolveTargetPrice } = require('../services/promoService');
+const { logToFile } = require('../utils/webhookLogger');
 
 // Стандартные коды ошибок Payme Merchant API.
 const ERROR = {
@@ -39,45 +41,112 @@ function rpcError(code, message, data) {
 }
 
 /**
+ * Разбирает заголовок Basic-авторизации Payme на схему/логин/пароль.
+ * Пароль (это и есть ключ кассы) наружу отдаётся только для сравнения — в логи попадают
+ * лишь схема и логин (логин у Payme всегда "Paycom" и секретом не является).
+ * @returns {{present: boolean, scheme: string|null, login: string|null, password: string|null}}
+ */
+function parseAuthHeader(authorizationHeader) {
+  const empty = { present: false, scheme: null, login: null, password: null };
+  if (typeof authorizationHeader !== 'string' || authorizationHeader.trim() === '') return empty;
+
+  const [scheme, ...rest] = authorizationHeader.trim().split(/\s+/);
+  const credentials = rest.join(' ');
+  if (!/^basic$/i.test(scheme)) return { present: true, scheme, login: null, password: null };
+
+  // Невалидный base64 не бросает исключение, а даёт мусор — его отсечёт проверка ниже.
+  const decoded = Buffer.from(credentials, 'base64').toString('utf8');
+
+  // Ключи Payme содержат спецсимволы и вполне могут содержать двоеточие — режем строго по
+  // ПЕРВОМУ двоеточию (разделитель login:password), иначе split(':') отрезал бы хвост ключа
+  // и авторизация всегда падала бы с -32504.
+  const separator = decoded.indexOf(':');
+  if (separator === -1) return { present: true, scheme, login: null, password: null };
+
+  return {
+    present: true,
+    scheme,
+    login: decoded.slice(0, separator),
+    password: decoded.slice(separator + 1),
+  };
+}
+
+/** Сравнение секретов за постоянное время. timingSafeEqual требует буферы одинаковой длины,
+ * поэтому длину проверяем заранее (сам факт несовпадения длины секретом не является). */
+function secretsEqual(received, expected) {
+  const a = Buffer.from(String(received), 'utf8');
+  const b = Buffer.from(String(expected), 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+/**
  * Проверка Basic-авторизации Payme. Логин игнорируется, сверяется только пароль/ключ
  * (в проде — PAYME_SECRET_KEY, в песочнице Payme используется PAYME_TEST_KEY).
+ * Незаданные ключи отфильтровываются: пустой PAYME_TEST_KEY ('' из config.js) раньше
+ * означал, что запрос с пустым паролем успешно авторизуется — кто угодно мог дёргать
+ * PerformTransaction и выдавать себе доступ.
  */
 function checkAuth(authorizationHeader) {
-  if (!authorizationHeader || !authorizationHeader.startsWith('Basic ')) return false;
+  const { password } = parseAuthHeader(authorizationHeader);
+  if (typeof password !== 'string' || password === '') return false;
 
-  const decoded = Buffer.from(authorizationHeader.slice('Basic '.length), 'base64').toString('utf8');
-  const [, password] = decoded.split(':');
+  return [config.payme.secretKey, config.payme.testKey]
+    .filter((key) => typeof key === 'string' && key !== '')
+    .some((key) => secretsEqual(password, key));
+}
 
-  return password === config.payme.secretKey || password === config.payme.testKey;
+/** Безопасная для логов справка о заголовке авторизации: без ключа и без самого заголовка. */
+function describeAuthHeader(authorizationHeader) {
+  const parsed = parseAuthHeader(authorizationHeader);
+  return {
+    present: parsed.present,
+    scheme: parsed.scheme,
+    login: parsed.login,
+    password_set: Boolean(parsed.password),
+    password_length: parsed.password ? parsed.password.length : 0,
+  };
 }
 
 /**
  * Разбирает account, присланный Payme. Поле account.* настраивается в личном кабинете
  * Payme Business — здесь ожидаем account.merchant_trans_id (см. payme.linkBuilder.js).
  *
- * Если платежа с таким merchant_trans_id ещё нет в БД — это может быть "оплата как за
- * коммуналку": юзер открыл приложение Payme напрямую, минуя бота, и ввёл свой код
+ * Если живого платежа Payme с таким merchant_trans_id ещё нет в БД — это может быть "оплата
+ * как за коммуналку": юзер открыл приложение Payme напрямую, минуя бота, и ввёл свой код
  * лицевого счёта. В этом случае merchant_trans_id прилетает как есть (сам код), и мы
  * пробуем найти по нему юзера, чтобы завести платёж на лету — суммой, которую реально
  * прислал Payme (может быть меньше цены канала, см. createTransaction/balanceService.js).
+ *
+ * ВАЖНО: один и тот же код юзера используется как лицевой счёт и в Click, и в Payme, поэтому
+ * ищем именно pending-платёж ПРОВАЙДЕРА payme, а не первую попавшуюся строку с этим
+ * merchant_trans_id. Раньше строка, заведённая Click по тому же коду, отдавалась сюда,
+ * отбраковывалась проверкой provider !== 'payme' и превращалась в вечный -31050: код
+ * навсегда "залипал" за тем провайдером, который создал строку первым.
  * @returns {Promise<{merchantTransId: string, payment: object|null, user: object|null}|null>}
  */
 async function resolveAccount(account) {
   const merchantTransId = account && (account.merchant_trans_id || account.code);
   if (!merchantTransId) return null;
 
-  const payment = await paymentsRepo.findByMerchantTransId(merchantTransId);
-  if (payment) {
-    // merchant_trans_id мог по крайне маловероятному совпадению принадлежать платежу,
-    // заведённому под другого провайдера (Click/промокод) — не отдаём его чужому вебхуку.
-    if (payment.provider !== 'payme') return null;
-    return { merchantTransId, payment, user: null };
-  }
+  const payment = await paymentsRepo.findPendingByProviderAndMerchantTransId('payme', merchantTransId);
+  if (payment) return { merchantTransId, payment, user: null };
 
   const user = await usersRepo.findByCode(merchantTransId);
-  if (!user || user.deleted_at || user.blocked_at || user.status === 'paid') return null;
+  if (user) {
+    if (user.deleted_at || user.blocked_at || user.status === 'paid') return null;
+    // Живого платежа Payme по этому коду нет (либо его ещё не было, либо предыдущий уже
+    // оплачен/отменён) — заводить новый разрешаем, платёж создаётся в createTransaction.
+    return { merchantTransId, payment: null, user };
+  }
 
-  return { merchantTransId, payment: null, user };
+  // merchant_trans_id — не код юзера, а конкретный заказ из бота (формат "<code>-<ts>"),
+  // и живого платежа по нему нет: он уже оплачен или отменён. Отдаём последнюю строку,
+  // чтобы вызывающий ответил -31008 ("заказ не оплачиваем"), а не -31050 ("счёт не найден").
+  const finished = await paymentsRepo.findLatestByProviderAndMerchantTransId('payme', merchantTransId);
+  if (finished) return { merchantTransId, payment: finished, user: null };
+
+  return null;
 }
 
 /**
@@ -138,6 +207,11 @@ async function checkPerformTransaction(params) {
     await assertUserStillPayable(resolved.payment.user_id);
   }
 
+  // Если в кабинете Payme у кассы включены фискальные чеки, этого ответа НЕДОСТАТОЧНО:
+  // Payme ждёт ещё detail.receipt_type и detail.items с ИКПУ/package_code/vat_percent на
+  // каждую позицию (те же данные потом уходят в PerformTransaction/фискальный модуль).
+  // Вслепую не заполняем: ИКПУ и package_code выдаются под конкретную услугу налоговой
+  // (soliq.uz), придуманные значения касса отклонит. См. README, раздел про Payme.
   return { allow: true };
 }
 
@@ -156,14 +230,16 @@ async function createTransaction(params) {
     // Платёж по коду ещё не заведён в БД — юзер платит вручную через приложение Payme,
     // минуя бота. Заводим его на лету суммой, которую реально прислал Payme (может быть
     // меньше цены канала — недоплата зачисляется на внутренний счёт, см. balanceService.js).
+    // createOrGetPendingPayment, а не createPayment: два почти одновременных CreateTransaction
+    // по одному коду не должны падать на уникальном индексе — второй просто подхватит строку,
+    // созданную первым (дальше его отсечёт проверка provider_trans_id ниже).
     payment =
       resolved.payment ||
-      (await paymentsRepo.createPayment({
+      (await paymentsRepo.createOrGetPendingPayment({
         userId: resolved.user.id,
         provider: 'payme',
         amount: tiyinToUzs(params.amount),
         merchantTransId: resolved.merchantTransId,
-        status: 'pending',
       }));
 
     await logEvent(payment.id, 'CreateTransaction', params);
@@ -351,7 +427,13 @@ const METHODS = {
 async function handleRpc(authorizationHeader, body) {
   const { method, params, id } = body || {};
 
-  if (!checkAuth(authorizationHeader)) {
+  const authOk = checkAuth(authorizationHeader);
+  // Диагностика авторизации: сам заголовок/ключ в лог не попадает — только схема, логин
+  // (у Payme это всегда "Paycom") и результат проверки. Без этого -32504 неотличим от
+  // исключения внутри хендлера: и то и другое Payme показывает юзеру одинаково
+  // ("Сервис поставщика услуг работает некорректно").
+  logToFile('payme', 'auth check', { method, ...describeAuthHeader(authorizationHeader), ok: authOk });
+  if (!authOk) {
     return { jsonrpc: '2.0', id, error: { code: ERROR.INSUFFICIENT_PRIVILEGE, message: 'Insufficient privilege' } };
   }
 
@@ -367,7 +449,10 @@ async function handleRpc(authorizationHeader, body) {
     if (err.rpc) {
       return { jsonrpc: '2.0', id, error: { code: err.rpc.code, message: err.rpc.message, data: err.rpc.data } };
     }
+    // Дублируем в файл: на этом хостинге (cPanel/Passenger) stdout нигде не сохраняется,
+    // см. src/utils/webhookLogger.js — без этого причина -32400 в проде не видна вообще.
     console.error('Payme RPC внутренняя ошибка:', err);
+    logToFile('payme', 'внутренняя ошибка хендлера', { method, message: err.message, stack: err.stack });
     return { jsonrpc: '2.0', id, error: { code: -32400, message: 'Internal error' } };
   }
 }
@@ -375,6 +460,7 @@ async function handleRpc(authorizationHeader, body) {
 module.exports = {
   handleRpc,
   checkAuth,
+  describeAuthHeader,
   ERROR,
   STATE,
   // экспортируем для тестов

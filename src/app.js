@@ -3,12 +3,17 @@ const session = require('express-session');
 const expressLayouts = require('express-ejs-layouts');
 const path = require('path');
 const config = require('./config');
-const knex = require('./db');
 const { bot } = require('./bot');
 const { logToFile } = require('./utils/webhookLogger');
 
 function buildApp() {
   const app = express();
+
+  // За reverse proxy (Nginx / cPanel Passenger) без этого req.secure всегда false и
+  // req.ip — адрес самого прокси. Первое ломает secure-куки сессии админки (а значит и
+  // CSRF-проверку при входе, см. config.trustProxy), второе — логи/уведомления, где мы
+  // пишем IP администратора. Отключается через TRUST_PROXY=false.
+  app.set('trust proxy', config.trustProxy);
 
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'web', 'views'));
@@ -59,9 +64,18 @@ function buildApp() {
   app.use(
     session({
       store: new pgSession({
-        knex,
+        // conString, а не knex: connect-pg-simple знает только pg (pool/conString/conObject),
+        // переданный сюда инстанс knex молча игнорировался, и стор поднимал свой pg.Pool()
+        // по process.env.DATABASE_URL. Это работало лишь пока переменная выставлена в
+        // окружении процесса; при запуске с другим источником настроек стор уходил в чужую
+        // базу, сессии не сохранялись, и вход в админку падал с "Invalid CSRF token".
+        // Берём ровно ту же строку подключения, что и весь остальной код (см. config.js).
+        conString: config.databaseUrl,
         tableName: 'session',
         createTableIfMissing: true,
+        // Ошибки стора сессий — в тот же файловый лог, что и вебхуки: на этом хостинге
+        // stdout процесса не сохраняется (см. utils/webhookLogger).
+        errorLog: (...args) => logToFile('session', 'ошибка хранилища сессий', { message: args.map(String).join(' ') }),
       }),
       name: 'sid',
       secret: config.sessionSecret,
@@ -73,7 +87,9 @@ function buildApp() {
       rolling: true,
       cookie: {
         httpOnly: true,
-        secure: config.isProduction,
+        // Не просто isProduction: secure-кука по http (прод без https-домена) не доедет до
+        // браузера вообще, и админка станет недоступна — см. config.useSecureCookies.
+        secure: config.useSecureCookies,
         sameSite: 'lax',
         maxAge: 1000 * 60 * 60 * config.adminSessionMaxAgeHours,
       },

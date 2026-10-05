@@ -23,12 +23,55 @@ async function createPayment({
   return payment;
 }
 
+/**
+ * Создаёт pending-платёж, а при гонке возвращает тот, который успел создать конкурент.
+ * Провайдеры ретраят запросы (и Click, и Payme могут прислать два почти одновременных
+ * Prepare/CheckPerformTransaction по одному коду) — вторая вставка проиграет на частичном
+ * уникальном индексе (provider, merchant_trans_id) WHERE status='pending' с SQLSTATE 23505,
+ * и это не ошибка: нужный платёж уже есть в БД, просто создали его не мы.
+ */
+async function createOrGetPendingPayment(data) {
+  try {
+    return await createPayment({ ...data, status: 'pending' });
+  } catch (err) {
+    if (err && err.code === '23505') {
+      const existing = await findPendingByProviderAndMerchantTransId(data.provider, data.merchantTransId);
+      if (existing) return existing;
+    }
+    throw err;
+  }
+}
+
 function findById(id) {
   return db('payments').where({ id }).first();
 }
 
 function findByMerchantTransId(merchantTransId) {
   return db('payments').where({ merchant_trans_id: merchantTransId }).first();
+}
+
+/**
+ * "Живой" (ещё не оплаченный и не отменённый) платёж конкретного провайдера по
+ * merchant_trans_id. Нужен из-за оплаты "как за коммуналку": там merchant_trans_id — это
+ * код юзера (users.code), один и тот же и для Click, и для Payme, поэтому строк с таким
+ * merchant_trans_id может быть несколько (по одной на провайдера/попытку). Брать первую
+ * попавшуюся нельзя — вебхук Payme не должен получить платёж, заведённый Click, иначе код
+ * навсегда "залипает" за тем провайдером, который создал строку первым.
+ * Частичный уникальный индекс (provider, merchant_trans_id) WHERE status='pending'
+ * (миграция 20260101000017) гарантирует, что такая строка не более одной.
+ */
+function findPendingByProviderAndMerchantTransId(provider, merchantTransId) {
+  return db('payments').where({ provider, merchant_trans_id: merchantTransId, status: 'pending' }).first();
+}
+
+/** Последний по времени платёж этого провайдера с таким merchant_trans_id — в любом статусе.
+ * Используется, когда живого платежа нет: по нему вебхук отвечает "заказ уже оплачен/отменён"
+ * (-4/-9 у Click, -31008 у Payme), а не вводящим в заблуждение "заказ не найден". */
+function findLatestByProviderAndMerchantTransId(provider, merchantTransId) {
+  return db('payments')
+    .where({ provider, merchant_trans_id: merchantTransId })
+    .orderBy('id', 'desc')
+    .first();
 }
 
 function findByProviderTransId(providerTransId) {
@@ -138,8 +181,11 @@ async function addEvent({ paymentId, provider, event, payload }) {
 
 module.exports = {
   createPayment,
+  createOrGetPendingPayment,
   findById,
   findByMerchantTransId,
+  findPendingByProviderAndMerchantTransId,
+  findLatestByProviderAndMerchantTransId,
   findByProviderTransId,
   setStatus,
   markPaid,

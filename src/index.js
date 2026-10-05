@@ -22,10 +22,16 @@ async function main() {
       merchant_id: config.click.merchantId || '(empty)',
       secret_key_set: Boolean(config.click.secretKey),
     });
+    // Длины ключей (не значения!) — единственный способ по логу отличить "ключ не задан"
+    // от "задан, но не тот" и понять, каким именно ключом Payme сейчас авторизуется: до
+    // активации кассы Payme подписывает запросы ТЕСТОВЫМ ключом, после — боевым.
     console.log('[startup] payme:', {
       enabled: config.payme.enabled,
       merchant_id: config.payme.merchantId || '(empty)',
       secret_key_set: Boolean(config.payme.secretKey),
+      secret_key_length: config.payme.secretKey ? config.payme.secretKey.length : 0,
+      test_key_set: Boolean(config.payme.testKey),
+      test_key_length: config.payme.testKey ? config.payme.testKey.length : 0,
     });
     // Явный маркер рестарта в самом файле логов — если после реальной оплаты в
     // logs/webhooks.log нет вообще НИЧЕГО (ни этой строки, ни запроса), значит процесс
@@ -44,6 +50,12 @@ async function main() {
       click_merchant_user_id: config.click.merchantUserId || '(пусто)',
       click_secret_key_set: Boolean(config.click.secretKey),
       click_secret_key_length: config.click.secretKey ? config.click.secretKey.length : 0,
+      payme_enabled: config.payme.enabled,
+      payme_merchant_id: config.payme.merchantId || '(пусто)',
+      payme_secret_key_set: Boolean(config.payme.secretKey),
+      payme_secret_key_length: config.payme.secretKey ? config.payme.secretKey.length : 0,
+      payme_test_key_set: Boolean(config.payme.testKey),
+      payme_test_key_length: config.payme.testKey ? config.payme.testKey.length : 0,
     });
   });
 
